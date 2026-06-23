@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Link, useParams } from "wouter";
 import { Badge } from "@/components/ui/badge";
+import { TierBadge } from "@/components/tier-badge";
 import {
   LineChart,
   Line,
@@ -56,8 +57,13 @@ export default function AgentDetail() {
             <Badge variant={agent.status === 'active' ? 'default' : agent.status === 'idle' ? 'outline' : 'secondary'} className="h-6">
               {agent.status}
             </Badge>
+            <TierBadge tier={agent.modelTier} className="h-6" />
           </div>
           <p className="text-muted-foreground max-w-2xl">{agent.purpose}</p>
+          <div className="text-sm text-muted-foreground">
+            Model: <span className="text-foreground font-medium">{agent.modelName}</span>{" "}
+            <span className="text-xs">({agent.provider})</span>
+          </div>
         </div>
         <div className="flex flex-col gap-1 text-sm text-muted-foreground md:text-right">
           <div>Created: {format(new Date(agent.createdAt), "MMM d, yyyy")}</div>

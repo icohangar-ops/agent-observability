@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
+import { TierBadge } from "@/components/tier-badge";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Search } from "lucide-react";
@@ -55,6 +56,7 @@ export default function Agents() {
               <TableHead>Owner</TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Model</TableHead>
+              <TableHead>Tier</TableHead>
               <TableHead className="text-right">Cost</TableHead>
               <TableHead className="text-right">Tokens</TableHead>
               <TableHead className="text-right">Runs</TableHead>
@@ -88,6 +90,9 @@ export default function Agents() {
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">{agent.modelName}</div>
+                </TableCell>
+                <TableCell>
+                  <TierBadge tier={agent.modelTier} />
                 </TableCell>
                 <TableCell className="text-right font-mono">{formatUSD(agent.cost)}</TableCell>
                 <TableCell className="text-right font-mono">{formatTokens(agent.tokens)}</TableCell>

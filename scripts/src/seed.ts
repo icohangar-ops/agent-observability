@@ -41,60 +41,114 @@ const departments = [
   { id: "dept-legal", name: "Legal" },
 ];
 
+// Tiers, ordered by access level / cost. A higher rank grants access to all
+// models at or below it.
+const tierRank: Record<string, number> = {
+  routine: 1,
+  research: 2,
+  frontier: 3,
+};
+
 const models = [
+  // Frontier — premium models for complex analysis
   {
     id: "gpt-4o",
     name: "GPT-4o",
     provider: "OpenAI",
+    tier: "frontier",
     inputPricePerMillion: "2.5000",
     outputPricePerMillion: "10.0000",
-    weight: 5,
-  },
-  {
-    id: "gpt-4o-mini",
-    name: "GPT-4o mini",
-    provider: "OpenAI",
-    inputPricePerMillion: "0.1500",
-    outputPricePerMillion: "0.6000",
-    weight: 7,
+    weight: 4,
   },
   {
     id: "claude-3-5-sonnet",
     name: "Claude 3.5 Sonnet",
     provider: "Anthropic",
+    tier: "frontier",
     inputPricePerMillion: "3.0000",
     outputPricePerMillion: "15.0000",
     weight: 5,
   },
+  // Research — web-grounded / research models
   {
-    id: "claude-3-haiku",
-    name: "Claude 3 Haiku",
-    provider: "Anthropic",
-    inputPricePerMillion: "0.2500",
-    outputPricePerMillion: "1.2500",
+    id: "perplexity-sonar-large",
+    name: "Perplexity Sonar Large",
+    provider: "Perplexity",
+    tier: "research",
+    inputPricePerMillion: "1.0000",
+    outputPricePerMillion: "1.0000",
     weight: 4,
   },
   {
     id: "gemini-1-5-pro",
     name: "Gemini 1.5 Pro",
     provider: "Google",
+    tier: "research",
     inputPricePerMillion: "1.2500",
     outputPricePerMillion: "5.0000",
+    weight: 3,
+  },
+  // Routine — cost-optimized models and routers for everyday work
+  {
+    id: "openrouter-auto",
+    name: "OpenRouter (Auto Router)",
+    provider: "OpenRouter",
+    tier: "routine",
+    inputPricePerMillion: "0.3000",
+    outputPricePerMillion: "0.6000",
+    weight: 5,
+  },
+  {
+    id: "baseten-router",
+    name: "Baseten Model Router",
+    provider: "Baseten",
+    tier: "routine",
+    inputPricePerMillion: "0.2000",
+    outputPricePerMillion: "0.4000",
+    weight: 3,
+  },
+  {
+    id: "gpt-4o-mini",
+    name: "GPT-4o mini",
+    provider: "OpenAI",
+    tier: "routine",
+    inputPricePerMillion: "0.1500",
+    outputPricePerMillion: "0.6000",
+    weight: 5,
+  },
+  {
+    id: "claude-3-haiku",
+    name: "Claude 3 Haiku",
+    provider: "Anthropic",
+    tier: "routine",
+    inputPricePerMillion: "0.2500",
+    outputPricePerMillion: "1.2500",
     weight: 3,
   },
   {
     id: "llama-3-1-70b",
     name: "Llama 3.1 70B",
     provider: "Meta",
+    tier: "routine",
     inputPricePerMillion: "0.5000",
     outputPricePerMillion: "0.7500",
     weight: 3,
   },
 ];
 
-const modelWeightPool: string[] = [];
-for (const m of models) {
-  for (let i = 0; i < m.weight; i++) modelWeightPool.push(m.id);
+function pickModelForTier(accessTier: string): string {
+  // Build an allowed pool of every model at or below the access tier. Higher
+  // tiers still lean on their own premium models, so bias toward the top tier.
+  const maxRank = tierRank[accessTier];
+  const pool: string[] = [];
+  for (const m of models) {
+    if (tierRank[m.tier] <= maxRank) {
+      // models that match the employee's own tier get extra weight
+      const bias = m.tier === accessTier ? 2 : 1;
+      for (let i = 0; i < m.weight * bias; i++) pool.push(m.id);
+    }
+  }
+  return pool[Math.floor(rand() * pool.length)];
 }
 
 const firstNames = [
@@ -146,6 +200,25 @@ const purposeSuffix = [
 
 const statuses = ["active", "active", "active", "idle", "idle", "archived"];
 
+// Default access tier granted to each department, reflecting the kind of work
+// they do. Individual employees may occasionally be upgraded a tier.
+const departmentAccessTier: Record<string, string> = {
+  "dept-finance": "frontier", // complex analysis
+  "dept-product": "frontier", // complex analysis
+  "dept-legal": "frontier", // complex analysis
+  "dept-eng": "research", // research + build
+  "dept-marketing": "research", // research-heavy content
+  "dept-support": "routine", // routine, high volume
+  "dept-sales": "routine", // routine outreach
+  "dept-ops": "routine", // routine operations
+};
+
+const tierUpgradePath: Record<string, string> = {
+  routine: "research",
+  research: "frontier",
+  frontier: "frontier",
+};
+
 async function main() {
   console.log("Clearing existing data...");
   await db.delete(usageEventsTable);
@@ -161,6 +234,7 @@ async function main() {
       id: m.id,
       name: m.name,
       provider: m.provider,
+      tier: m.tier,
       inputPricePerMillion: m.inputPricePerMillion,
       outputPricePerMillion: m.outputPricePerMillion,
     })),
@@ -171,6 +245,7 @@ async function main() {
     id: string;
     name: string;
     role: string;
+    accessTier: string;
     departmentId: string;
   }[] = [];
   let empCounter = 0;
@@ -179,10 +254,15 @@ async function main() {
     for (let i = 0; i < count; i++) {
       empCounter++;
       const name = `${pick(firstNames)} ${pick(lastNames)}`;
+      const baseTier = departmentAccessTier[dept.id];
+      // ~20% of employees are granted one tier above their department default.
+      const accessTier =
+        rand() < 0.2 ? tierUpgradePath[baseTier] : baseTier;
       employees.push({
         id: `emp-${empCounter}`,
         name,
         role: pick(rolesByDept[dept.id]),
+        accessTier,
         departmentId: dept.id,
       });
     }
@@ -221,7 +301,7 @@ async function main() {
         purpose: `${baseName} ${pick(purposeSuffix)}`,
         status,
         employeeId: emp.id,
-        modelId: pick(modelWeightPool),
+        modelId: pickModelForTier(emp.accessTier),
         createdAt,
         lastActiveAt: createdAt, // updated below from usage
       });

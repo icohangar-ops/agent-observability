@@ -3,6 +3,7 @@ import { formatUSD, formatTokens, formatPercent, formatNumber } from "@/lib/form
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TierBadge } from "@/components/tier-badge";
 
 export default function Models() {
   const { data: models, isLoading } = useListModels();
@@ -28,6 +29,7 @@ export default function Models() {
           <TableHeader>
             <TableRow>
               <TableHead>Model</TableHead>
+              <TableHead>Tier</TableHead>
               <TableHead>Pricing (1M In/Out)</TableHead>
               <TableHead className="text-right">Cost Share</TableHead>
               <TableHead className="text-right">Total Cost</TableHead>
@@ -42,6 +44,9 @@ export default function Models() {
                 <TableCell>
                   <div className="font-medium">{model.name}</div>
                   <div className="text-xs text-muted-foreground">{model.provider}</div>
+                </TableCell>
+                <TableCell>
+                  <TierBadge tier={model.tier} />
                 </TableCell>
                 <TableCell className="font-mono text-sm">
                   {formatUSD(model.inputPricePerMillion)} / {formatUSD(model.outputPricePerMillion)}

@@ -19,6 +19,8 @@ export interface Agent {
   modelId: string;
   modelName: string;
   provider: string;
+  /** Access tier of the agent's model (frontier, research, routine) */
+  modelTier: string;
   cost: number;
   tokens: number;
   inputTokens: number;

@@ -10,6 +10,8 @@ export interface ModelUsage {
   modelId: string;
   modelName: string;
   provider: string;
+  /** Access tier (frontier, research, routine) */
+  tier: string;
   cost: number;
   tokens: number;
 }

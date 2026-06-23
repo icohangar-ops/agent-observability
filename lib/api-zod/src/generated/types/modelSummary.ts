@@ -10,6 +10,8 @@ export interface ModelSummary {
   id: string;
   name: string;
   provider: string;
+  /** Access tier (frontier, research, routine) */
+  tier: string;
   /** USD per 1M input tokens */
   inputPricePerMillion: number;
   /** USD per 1M output tokens */

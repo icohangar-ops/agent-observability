@@ -10,6 +10,7 @@ import Departments from "@/pages/departments";
 import DepartmentDetail from "@/pages/department-detail";
 import Employees from "@/pages/employees";
 import EmployeeDetail from "@/pages/employee-detail";
+import Tiers from "@/pages/tiers";
 import Models from "@/pages/models";
 import Agents from "@/pages/agents";
 import AgentDetail from "@/pages/agent-detail";
@@ -25,6 +26,7 @@ function Router() {
         <Route path="/departments/:departmentId" component={DepartmentDetail} />
         <Route path="/employees" component={Employees} />
         <Route path="/employees/:employeeId" component={EmployeeDetail} />
+        <Route path="/tiers" component={Tiers} />
         <Route path="/models" component={Models} />
         <Route path="/agents" component={Agents} />
         <Route path="/agents/:agentId" component={AgentDetail} />

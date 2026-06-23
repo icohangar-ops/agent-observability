@@ -26,6 +26,7 @@ import type {
   HealthStatus,
   ModelSummary,
   Overview,
+  TierSummary,
   TrendPoint
 } from './api.schemas';
 
@@ -809,6 +810,84 @@ export function useGetAgent<TData = Awaited<ReturnType<typeof getAgent>>, TError
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAgentQueryOptions(agentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListTiersUrl = () => {
+
+
+
+
+  return `/api/tiers`
+}
+
+/**
+ * Spend, token usage, model membership, and access governance grouped by model access tier (frontier, research, routine).
+ * @summary Access tier breakdown
+ */
+export const listTiers = async ( options?: RequestInit): Promise<TierSummary[]> => {
+
+  return customFetch<TierSummary[]>(getListTiersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTiersQueryKey = () => {
+    return [
+    `/api/tiers`
+    ] as const;
+    }
+
+
+export const getListTiersQueryOptions = <TData = Awaited<ReturnType<typeof listTiers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTiers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTiersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTiers>>> = ({ signal }) => listTiers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTiers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTiersQueryResult = NonNullable<Awaited<ReturnType<typeof listTiers>>>
+export type ListTiersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Access tier breakdown
+ */
+
+export function useListTiers<TData = Awaited<ReturnType<typeof listTiers>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTiers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTiersQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

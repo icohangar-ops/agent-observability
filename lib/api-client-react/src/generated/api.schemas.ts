@@ -57,6 +57,8 @@ export interface EmployeeSummary {
   id: string;
   name: string;
   role: string;
+  /** Highest model tier granted (frontier, research, routine) */
+  accessTier: string;
   departmentId: string;
   departmentName: string;
   cost: number;
@@ -71,6 +73,8 @@ export interface ModelUsage {
   modelId: string;
   modelName: string;
   provider: string;
+  /** Access tier (frontier, research, routine) */
+  tier: string;
   cost: number;
   tokens: number;
 }
@@ -103,6 +107,8 @@ export interface Agent {
   modelId: string;
   modelName: string;
   provider: string;
+  /** Access tier of the agent's model (frontier, research, routine) */
+  modelTier: string;
   cost: number;
   tokens: number;
   inputTokens: number;
@@ -116,6 +122,8 @@ export interface EmployeeDetail {
   id: string;
   name: string;
   role: string;
+  /** Highest model tier granted (frontier, research, routine) */
+  accessTier: string;
   departmentId: string;
   departmentName: string;
   cost: number;
@@ -132,6 +140,8 @@ export interface ModelSummary {
   id: string;
   name: string;
   provider: string;
+  /** Access tier (frontier, research, routine) */
+  tier: string;
   /** USD per 1M input tokens */
   inputPricePerMillion: number;
   /** USD per 1M output tokens */
@@ -166,6 +176,8 @@ export interface AgentDetail {
   modelId: string;
   modelName: string;
   provider: string;
+  /** Access tier of the agent's model (frontier, research, routine) */
+  modelTier: string;
   cost: number;
   tokens: number;
   inputTokens: number;
@@ -175,5 +187,26 @@ export interface AgentDetail {
   lastActiveAt: string;
   trends: TrendPoint[];
   recentRuns: AgentRun[];
+}
+
+export interface TierSummary {
+  /** Tier id (frontier, research, routine) */
+  tier: string;
+  /** Human-readable tier name */
+  label: string;
+  /** Spend on models in this tier */
+  cost: number;
+  tokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** Fraction of total org cost in this tier (0-1) */
+  costShare: number;
+  /** Agents whose model is in this tier */
+  agentCount: number;
+  /** Employees whose granted access tier equals this tier */
+  employeeCount: number;
+  modelCount: number;
+  runCount: number;
+  models: ModelUsage[];
 }
 

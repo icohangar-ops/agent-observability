@@ -13,6 +13,18 @@ function num(v: unknown): number {
   return v === null || v === undefined ? 0 : Number(v);
 }
 
+const TIER_LABELS: Record<string, string> = {
+  frontier: "Frontier",
+  research: "Research",
+  routine: "Routine",
+};
+
+const TIER_ORDER: Record<string, number> = {
+  frontier: 0,
+  research: 1,
+  routine: 2,
+};
+
 router.get("/overview", async (_req, res) => {
   const totalsQ = await pool.query(`
     SELECT
@@ -141,7 +153,7 @@ async function employeeSummaries(whereDept?: string) {
   const q = await pool.query(
     `
     SELECT
-      e.id, e.name, e.role, d.id AS department_id, d.name AS department_name,
+      e.id, e.name, e.role, e.access_tier, d.id AS department_id, d.name AS department_name,
       COALESCE(SUM(${COST_SQL}), 0) AS cost,
       COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens,
       COALESCE(SUM(u.input_tokens), 0) AS input_tokens,
@@ -154,7 +166,7 @@ async function employeeSummaries(whereDept?: string) {
     LEFT JOIN models m ON m.id = a.model_id
     LEFT JOIN usage_events u ON u.agent_id = a.id
     ${where}
-    GROUP BY e.id, e.name, e.role, d.id, d.name
+    GROUP BY e.id, e.name, e.role, e.access_tier, d.id, d.name
     ORDER BY cost DESC
   `,
     params,
@@ -163,6 +175,7 @@ async function employeeSummaries(whereDept?: string) {
     id: r.id,
     name: r.name,
     role: r.role,
+    accessTier: r.access_tier,
     departmentId: r.department_id,
     departmentName: r.department_name,
     cost: num(r.cost),
@@ -188,7 +201,7 @@ async function modelBreakdown(opts: { departmentId?: string; employeeId?: string
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   const q = await pool.query(
     `
-    SELECT m.id AS model_id, m.name AS model_name, m.provider,
+    SELECT m.id AS model_id, m.name AS model_name, m.provider, m.tier,
       COALESCE(SUM(${COST_SQL}), 0) AS cost,
       COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens
     FROM usage_events u
@@ -196,7 +209,7 @@ async function modelBreakdown(opts: { departmentId?: string; employeeId?: string
     JOIN employees e ON e.id = a.employee_id
     JOIN models m ON m.id = a.model_id
     ${where}
-    GROUP BY m.id, m.name, m.provider
+    GROUP BY m.id, m.name, m.provider, m.tier
     ORDER BY cost DESC
   `,
     params,
@@ -205,6 +218,7 @@ async function modelBreakdown(opts: { departmentId?: string; employeeId?: string
     modelId: r.model_id,
     modelName: r.model_name,
     provider: r.provider,
+    tier: r.tier,
     cost: num(r.cost),
     tokens: num(r.tokens),
   }));
@@ -275,7 +289,7 @@ async function agentRows(opts: { employeeId?: string; agentId?: string }) {
       a.id, a.name, a.purpose, a.status,
       e.id AS employee_id, e.name AS employee_name,
       d.id AS department_id, d.name AS department_name,
-      m.id AS model_id, m.name AS model_name, m.provider,
+      m.id AS model_id, m.name AS model_name, m.provider, m.tier AS model_tier,
       to_char(a.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
       to_char(a.last_active_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS last_active_at,
       COALESCE(agg.cost, 0) AS cost,
@@ -317,6 +331,7 @@ async function agentRows(opts: { employeeId?: string; agentId?: string }) {
     modelId: r.model_id,
     modelName: r.model_name,
     provider: r.provider,
+    modelTier: r.model_tier,
     cost: num(r.cost),
     tokens: num(r.tokens),
     inputTokens: num(r.input_tokens),
@@ -330,7 +345,7 @@ async function agentRows(opts: { employeeId?: string; agentId?: string }) {
 router.get("/employees/:employeeId", async (req, res) => {
   const { employeeId } = req.params;
   const empQ = await pool.query(
-    `SELECT e.id, e.name, e.role, d.id AS department_id, d.name AS department_name
+    `SELECT e.id, e.name, e.role, e.access_tier, d.id AS department_id, d.name AS department_name
      FROM employees e JOIN departments d ON d.id = e.department_id WHERE e.id = $1`,
     [employeeId],
   );
@@ -352,6 +367,7 @@ router.get("/employees/:employeeId", async (req, res) => {
     id: e.id,
     name: e.name,
     role: e.role,
+    accessTier: e.access_tier,
     departmentId: e.department_id,
     departmentName: e.department_name,
     cost,
@@ -367,7 +383,7 @@ router.get("/employees/:employeeId", async (req, res) => {
 
 router.get("/models", async (_req, res) => {
   const q = await pool.query(`
-    SELECT m.id, m.name, m.provider,
+    SELECT m.id, m.name, m.provider, m.tier,
       m.input_price_per_million, m.output_price_per_million,
       COALESCE(SUM(${COST_SQL}), 0) AS cost,
       COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens,
@@ -378,7 +394,7 @@ router.get("/models", async (_req, res) => {
     FROM models m
     LEFT JOIN agents a ON a.model_id = m.id
     LEFT JOIN usage_events u ON u.agent_id = a.id
-    GROUP BY m.id, m.name, m.provider, m.input_price_per_million, m.output_price_per_million
+    GROUP BY m.id, m.name, m.provider, m.tier, m.input_price_per_million, m.output_price_per_million
     ORDER BY cost DESC
   `);
   const total = q.rows.reduce((s, r) => s + num(r.cost), 0);
@@ -387,6 +403,7 @@ router.get("/models", async (_req, res) => {
       id: r.id,
       name: r.name,
       provider: r.provider,
+      tier: r.tier,
       inputPricePerMillion: num(r.input_price_per_million),
       outputPricePerMillion: num(r.output_price_per_million),
       cost: num(r.cost),
@@ -398,6 +415,102 @@ router.get("/models", async (_req, res) => {
       costShare: total > 0 ? num(r.cost) / total : 0,
     })),
   );
+});
+
+router.get("/tiers", async (_req, res) => {
+  const modelsQ = await pool.query(`
+    SELECT m.id, m.name, m.provider, m.tier,
+      COALESCE(SUM(${COST_SQL}), 0) AS cost,
+      COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens,
+      COALESCE(SUM(u.input_tokens), 0) AS input_tokens,
+      COALESCE(SUM(u.output_tokens), 0) AS output_tokens,
+      COUNT(DISTINCT a.id) AS agent_count,
+      COUNT(u.id) AS run_count
+    FROM models m
+    LEFT JOIN agents a ON a.model_id = m.id
+    LEFT JOIN usage_events u ON u.agent_id = a.id
+    GROUP BY m.id, m.name, m.provider, m.tier
+    ORDER BY cost DESC
+  `);
+
+  const empQ = await pool.query(`
+    SELECT access_tier AS tier, COUNT(*) AS employee_count
+    FROM employees GROUP BY access_tier
+  `);
+  const employeeByTier = new Map<string, number>();
+  for (const r of empQ.rows) employeeByTier.set(r.tier, num(r.employee_count));
+
+  type TierAgg = {
+    tier: string;
+    cost: number;
+    tokens: number;
+    inputTokens: number;
+    outputTokens: number;
+    agentCount: number;
+    runCount: number;
+    models: Array<{
+      modelId: string;
+      modelName: string;
+      provider: string;
+      tier: string;
+      cost: number;
+      tokens: number;
+    }>;
+  };
+  const tiers = new Map<string, TierAgg>();
+  let total = 0;
+  for (const r of modelsQ.rows) {
+    const tier = r.tier as string;
+    const cost = num(r.cost);
+    total += cost;
+    let t = tiers.get(tier);
+    if (!t) {
+      t = {
+        tier,
+        cost: 0,
+        tokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        agentCount: 0,
+        runCount: 0,
+        models: [],
+      };
+      tiers.set(tier, t);
+    }
+    t.cost += cost;
+    t.tokens += num(r.tokens);
+    t.inputTokens += num(r.input_tokens);
+    t.outputTokens += num(r.output_tokens);
+    t.agentCount += num(r.agent_count);
+    t.runCount += num(r.run_count);
+    t.models.push({
+      modelId: r.id,
+      modelName: r.name,
+      provider: r.provider,
+      tier,
+      cost,
+      tokens: num(r.tokens),
+    });
+  }
+
+  const result = Array.from(tiers.values())
+    .sort((a, b) => (TIER_ORDER[a.tier] ?? 99) - (TIER_ORDER[b.tier] ?? 99))
+    .map((t) => ({
+      tier: t.tier,
+      label: TIER_LABELS[t.tier] ?? t.tier,
+      cost: t.cost,
+      tokens: t.tokens,
+      inputTokens: t.inputTokens,
+      outputTokens: t.outputTokens,
+      costShare: total > 0 ? t.cost / total : 0,
+      agentCount: t.agentCount,
+      employeeCount: employeeByTier.get(t.tier) ?? 0,
+      modelCount: t.models.length,
+      runCount: t.runCount,
+      models: t.models,
+    }));
+
+  res.json(result);
 });
 
 router.get("/agents", async (_req, res) => {

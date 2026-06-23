@@ -18,4 +18,5 @@ export * from './healthStatus';
 export * from './modelSummary';
 export * from './modelUsage';
 export * from './overview';
+export * from './tierSummary';
 export * from './trendPoint';

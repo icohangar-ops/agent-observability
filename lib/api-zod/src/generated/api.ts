@@ -92,6 +92,7 @@ export const GetDepartmentResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "role": zod.string(),
+  "accessTier": zod.string().describe('Highest model tier granted (frontier, research, routine)'),
   "departmentId": zod.string(),
   "departmentName": zod.string(),
   "cost": zod.number(),
@@ -105,6 +106,7 @@ export const GetDepartmentResponse = zod.object({
   "modelId": zod.string(),
   "modelName": zod.string(),
   "provider": zod.string(),
+  "tier": zod.string().describe('Access tier (frontier, research, routine)'),
   "cost": zod.number(),
   "tokens": zod.number()
 }))
@@ -119,6 +121,7 @@ export const ListEmployeesResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "role": zod.string(),
+  "accessTier": zod.string().describe('Highest model tier granted (frontier, research, routine)'),
   "departmentId": zod.string(),
   "departmentName": zod.string(),
   "cost": zod.number(),
@@ -143,6 +146,7 @@ export const GetEmployeeResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "role": zod.string(),
+  "accessTier": zod.string().describe('Highest model tier granted (frontier, research, routine)'),
   "departmentId": zod.string(),
   "departmentName": zod.string(),
   "cost": zod.number(),
@@ -163,6 +167,7 @@ export const GetEmployeeResponse = zod.object({
   "modelId": zod.string(),
   "modelName": zod.string(),
   "provider": zod.string(),
+  "modelTier": zod.string().describe('Access tier of the agent\'s model (frontier, research, routine)'),
   "cost": zod.number(),
   "tokens": zod.number(),
   "inputTokens": zod.number(),
@@ -175,6 +180,7 @@ export const GetEmployeeResponse = zod.object({
   "modelId": zod.string(),
   "modelName": zod.string(),
   "provider": zod.string(),
+  "tier": zod.string().describe('Access tier (frontier, research, routine)'),
   "cost": zod.number(),
   "tokens": zod.number()
 }))
@@ -189,6 +195,7 @@ export const ListModelsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "provider": zod.string(),
+  "tier": zod.string().describe('Access tier (frontier, research, routine)'),
   "inputPricePerMillion": zod.number().describe('USD per 1M input tokens'),
   "outputPricePerMillion": zod.number().describe('USD per 1M output tokens'),
   "cost": zod.number(),
@@ -218,6 +225,7 @@ export const ListAgentsResponseItem = zod.object({
   "modelId": zod.string(),
   "modelName": zod.string(),
   "provider": zod.string(),
+  "modelTier": zod.string().describe('Access tier of the agent\'s model (frontier, research, routine)'),
   "cost": zod.number(),
   "tokens": zod.number(),
   "inputTokens": zod.number(),
@@ -249,6 +257,7 @@ export const GetAgentResponse = zod.object({
   "modelId": zod.string(),
   "modelName": zod.string(),
   "provider": zod.string(),
+  "modelTier": zod.string().describe('Access tier of the agent\'s model (frontier, research, routine)'),
   "cost": zod.number(),
   "tokens": zod.number(),
   "inputTokens": zod.number(),
@@ -270,5 +279,33 @@ export const GetAgentResponse = zod.object({
   "cost": zod.number()
 }))
 })
+
+
+/**
+ * Spend, token usage, model membership, and access governance grouped by model access tier (frontier, research, routine).
+ * @summary Access tier breakdown
+ */
+export const ListTiersResponseItem = zod.object({
+  "tier": zod.string().describe('Tier id (frontier, research, routine)'),
+  "label": zod.string().describe('Human-readable tier name'),
+  "cost": zod.number().describe('Spend on models in this tier'),
+  "tokens": zod.number(),
+  "inputTokens": zod.number(),
+  "outputTokens": zod.number(),
+  "costShare": zod.number().describe('Fraction of total org cost in this tier (0-1)'),
+  "agentCount": zod.number().describe('Agents whose model is in this tier'),
+  "employeeCount": zod.number().describe('Employees whose granted access tier equals this tier'),
+  "modelCount": zod.number(),
+  "runCount": zod.number(),
+  "models": zod.array(zod.object({
+  "modelId": zod.string(),
+  "modelName": zod.string(),
+  "provider": zod.string(),
+  "tier": zod.string().describe('Access tier (frontier, research, routine)'),
+  "cost": zod.number(),
+  "tokens": zod.number()
+}))
+})
+export const ListTiersResponse = zod.array(ListTiersResponseItem)
 
 

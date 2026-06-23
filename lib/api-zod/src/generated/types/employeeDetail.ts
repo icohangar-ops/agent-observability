@@ -12,6 +12,8 @@ export interface EmployeeDetail {
   id: string;
   name: string;
   role: string;
+  /** Highest model tier granted (frontier, research, routine) */
+  accessTier: string;
   departmentId: string;
   departmentName: string;
   cost: number;

@@ -197,6 +197,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /tiers:
+    get:
+      operationId: listTiers
+      tags: [tiers]
+      summary: Access tier breakdown
+      description: >-
+        Spend, token usage, model membership, and access governance grouped by
+        model access tier (frontier, research, routine).
+      responses:
+        "200":
+          description: Tiers with aggregates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TierSummary"
 components:
   schemas:
     HealthStatus:
@@ -356,6 +373,7 @@ components:
         - id
         - name
         - role
+        - accessTier
         - departmentId
         - departmentName
         - cost
@@ -371,6 +389,9 @@ components:
           type: string
         role:
           type: string
+        accessTier:
+          type: string
+          description: Highest model tier granted (frontier, research, routine)
         departmentId:
           type: string
         departmentName:
@@ -393,6 +414,7 @@ components:
         - id
         - name
         - role
+        - accessTier
         - departmentId
         - departmentName
         - cost
@@ -410,6 +432,9 @@ components:
           type: string
         role:
           type: string
+        accessTier:
+          type: string
+          description: Highest model tier granted (frontier, research, routine)
         departmentId:
           type: string
         departmentName:
@@ -440,6 +465,7 @@ components:
         - id
         - name
         - provider
+        - tier
         - inputPricePerMillion
         - outputPricePerMillion
         - cost
@@ -456,6 +482,9 @@ components:
           type: string
         provider:
           type: string
+        tier:
+          type: string
+          description: Access tier (frontier, research, routine)
         inputPricePerMillion:
           type: number
           description: USD per 1M input tokens
@@ -482,6 +511,7 @@ components:
         - modelId
         - modelName
         - provider
+        - tier
         - cost
         - tokens
       properties:
@@ -491,6 +521,9 @@ components:
           type: string
         provider:
           type: string
+        tier:
+          type: string
+          description: Access tier (frontier, research, routine)
         cost:
           type: number
         tokens:
@@ -509,6 +542,7 @@ components:
         - modelId
         - modelName
         - provider
+        - modelTier
         - cost
         - tokens
         - inputTokens
@@ -540,6 +574,9 @@ components:
           type: string
         provider:
           type: string
+        modelTier:
+          type: string
+          description: Access tier of the agent's model (frontier, research, routine)
         cost:
           type: number
         tokens:
@@ -568,6 +605,7 @@ components:
         - modelId
         - modelName
         - provider
+        - modelTier
         - cost
         - tokens
         - inputTokens
@@ -600,6 +638,9 @@ components:
           type: string
         provider:
           type: string
+        modelTier:
+          type: string
+          description: Access tier of the agent's model (frontier, research, routine)
         cost:
           type: number
         tokens:
@@ -644,3 +685,51 @@ components:
           type: integer
         cost:
           type: number
+    TierSummary:
+      type: object
+      required:
+        - tier
+        - label
+        - cost
+        - tokens
+        - inputTokens
+        - outputTokens
+        - costShare
+        - agentCount
+        - employeeCount
+        - modelCount
+        - runCount
+        - models
+      properties:
+        tier:
+          type: string
+          description: Tier id (frontier, research, routine)
+        label:
+          type: string
+          description: Human-readable tier name
+        cost:
+          type: number
+          description: Spend on models in this tier
+        tokens:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        costShare:
+          type: number
+          description: Fraction of total org cost in this tier (0-1)
+        agentCount:
+          type: integer
+          description: Agents whose model is in this tier
+        employeeCount:
+          type: integer
+          description: Employees whose granted access tier equals this tier
+        modelCount:
+          type: integer
+        runCount:
+          type: integer
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelUsage"

@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
+import { TierBadge } from "@/components/tier-badge";
 
 export default function Employees() {
   const { data: employees, isLoading } = useListEmployees();
@@ -30,6 +31,7 @@ export default function Employees() {
             <TableRow>
               <TableHead>Employee</TableHead>
               <TableHead>Department</TableHead>
+              <TableHead>Access Tier</TableHead>
               <TableHead className="text-right">Total Cost</TableHead>
               <TableHead className="text-right">Tokens</TableHead>
               <TableHead className="text-right">Agents</TableHead>
@@ -51,6 +53,9 @@ export default function Employees() {
                   <Link href={`/departments/${emp.departmentId}`} className="text-sm hover:underline hover:text-primary">
                     {emp.departmentName}
                   </Link>
+                </TableCell>
+                <TableCell>
+                  <TierBadge tier={emp.accessTier} />
                 </TableCell>
                 <TableCell className="text-right font-mono">{formatUSD(emp.cost)}</TableCell>
                 <TableCell className="text-right font-mono">{formatTokens(emp.tokens)}</TableCell>

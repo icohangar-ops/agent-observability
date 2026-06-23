@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Link, useParams } from "wouter";
 import { Badge } from "@/components/ui/badge";
+import { TierBadge } from "@/components/tier-badge";
 
 export default function EmployeeDetail() {
   const { employeeId } = useParams<{ employeeId: string }>();
@@ -47,6 +48,10 @@ export default function EmployeeDetail() {
           <Link href={`/departments/${emp.departmentId}`} className="hover:underline hover:text-primary">
             {emp.departmentName}
           </Link>
+          <span>•</span>
+          <span className="flex items-center gap-1.5">
+            Access tier <TierBadge tier={emp.accessTier} />
+          </span>
         </div>
       </div>
 

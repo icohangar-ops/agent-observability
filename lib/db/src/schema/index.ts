@@ -17,6 +17,8 @@ export const modelsTable = pgTable("models", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   provider: text("provider").notNull(),
+  // Access tier this model belongs to: "frontier" | "research" | "routine"
+  tier: text("tier").notNull(),
   inputPricePerMillion: numeric("input_price_per_million", {
     precision: 12,
     scale: 4,
@@ -31,6 +33,9 @@ export const employeesTable = pgTable("employees", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   role: text("role").notNull(),
+  // Highest model tier this employee is granted access to:
+  // "frontier" | "research" | "routine"
+  accessTier: text("access_tier").notNull(),
   departmentId: text("department_id")
     .notNull()
     .references(() => departmentsTable.id),
