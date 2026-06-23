@@ -41,11 +41,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <DateRangeProvider>
-          <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
+        <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
+          <DateRangeProvider>
             <Router />
-          </WouterRouter>
-        </DateRangeProvider>
+          </DateRangeProvider>
+        </WouterRouter>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
