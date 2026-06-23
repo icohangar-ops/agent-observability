@@ -1,0 +1,1 @@
+- [Orval codegen quirk](orval-codegen.md) — prettier:true hangs codegen at "Cleaning output folder" in this env; keep prettier disabled.

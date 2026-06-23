@@ -10,6 +10,16 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: overview
+    description: Organization-wide observability summary
+  - name: departments
+    description: Department-level attribution and drill-down
+  - name: employees
+    description: Employee-level attribution and drill-down
+  - name: models
+    description: Model usage and cost breakdown
+  - name: agents
+    description: Agent inventory with attribution
 paths:
   /healthz:
     get:
@@ -24,6 +34,169 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /overview:
+    get:
+      operationId: getOverview
+      tags: [overview]
+      summary: Organization observability summary
+      description: Totals for cost and tokens across the whole organization, plus headline counts.
+      responses:
+        "200":
+          description: Overview summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Overview"
+  /overview/trends:
+    get:
+      operationId: getTrends
+      tags: [overview]
+      summary: Cost and token trends over time
+      description: Daily time series of cost and token usage across the organization.
+      responses:
+        "200":
+          description: Daily trend points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendPoint"
+  /departments:
+    get:
+      operationId: listDepartments
+      tags: [departments]
+      summary: Department breakdown
+      description: Cost, token usage, and counts grouped by department.
+      responses:
+        "200":
+          description: Departments with aggregates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DepartmentSummary"
+  /departments/{departmentId}:
+    get:
+      operationId: getDepartment
+      tags: [departments]
+      summary: Department detail
+      description: A single department with its employees and usage aggregates.
+      parameters:
+        - name: departmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Department detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /employees:
+    get:
+      operationId: listEmployees
+      tags: [employees]
+      summary: Employee breakdown
+      description: Cost, token usage, and agent counts grouped by employee.
+      responses:
+        "200":
+          description: Employees with aggregates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeSummary"
+  /employees/{employeeId}:
+    get:
+      operationId: getEmployee
+      tags: [employees]
+      summary: Employee detail
+      description: A single employee with the agents they launched and usage aggregates.
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Employee detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /models:
+    get:
+      operationId: listModels
+      tags: [models]
+      summary: Model breakdown
+      description: Cost, token usage, and agent counts grouped by model, including per-model pricing.
+      responses:
+        "200":
+          description: Models with aggregates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModelSummary"
+  /agents:
+    get:
+      operationId: listAgents
+      tags: [agents]
+      summary: Agent inventory
+      description: All agents with full attribution (employee, department, model) and usage.
+      responses:
+        "200":
+          description: Agents with attribution
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agent"
+  /agents/{agentId}:
+    get:
+      operationId: getAgent
+      tags: [agents]
+      summary: Agent detail
+      description: A single agent with attribution, usage aggregates, and recent activity.
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Agent detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +206,441 @@ components:
           type: string
       required:
         - status
-
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    Overview:
+      type: object
+      required:
+        - totalCost
+        - totalTokens
+        - totalInputTokens
+        - totalOutputTokens
+        - agentCount
+        - activeAgentCount
+        - employeeCount
+        - departmentCount
+        - modelCount
+        - runCount
+        - avgCostPerAgent
+        - topDepartment
+        - topModel
+      properties:
+        totalCost:
+          type: number
+          description: Total spend in USD across all usage
+        totalTokens:
+          type: integer
+        totalInputTokens:
+          type: integer
+        totalOutputTokens:
+          type: integer
+        agentCount:
+          type: integer
+        activeAgentCount:
+          type: integer
+        employeeCount:
+          type: integer
+        departmentCount:
+          type: integer
+        modelCount:
+          type: integer
+        runCount:
+          type: integer
+        avgCostPerAgent:
+          type: number
+        topDepartment:
+          type: ["string", "null"]
+        topModel:
+          type: ["string", "null"]
+    TrendPoint:
+      type: object
+      required:
+        - date
+        - cost
+        - tokens
+      properties:
+        date:
+          type: string
+          description: ISO date (YYYY-MM-DD)
+        cost:
+          type: number
+        tokens:
+          type: integer
+    DepartmentSummary:
+      type: object
+      required:
+        - id
+        - name
+        - cost
+        - tokens
+        - inputTokens
+        - outputTokens
+        - agentCount
+        - employeeCount
+        - runCount
+        - costShare
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        cost:
+          type: number
+        tokens:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        agentCount:
+          type: integer
+        employeeCount:
+          type: integer
+        runCount:
+          type: integer
+        costShare:
+          type: number
+          description: Fraction of total org cost (0-1)
+    DepartmentDetail:
+      type: object
+      required:
+        - id
+        - name
+        - cost
+        - tokens
+        - inputTokens
+        - outputTokens
+        - agentCount
+        - employeeCount
+        - runCount
+        - costShare
+        - employees
+        - modelBreakdown
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        cost:
+          type: number
+        tokens:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        agentCount:
+          type: integer
+        employeeCount:
+          type: integer
+        runCount:
+          type: integer
+        costShare:
+          type: number
+        employees:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmployeeSummary"
+        modelBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelUsage"
+    EmployeeSummary:
+      type: object
+      required:
+        - id
+        - name
+        - role
+        - departmentId
+        - departmentName
+        - cost
+        - tokens
+        - inputTokens
+        - outputTokens
+        - agentCount
+        - runCount
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        departmentId:
+          type: string
+        departmentName:
+          type: string
+        cost:
+          type: number
+        tokens:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        agentCount:
+          type: integer
+        runCount:
+          type: integer
+    EmployeeDetail:
+      type: object
+      required:
+        - id
+        - name
+        - role
+        - departmentId
+        - departmentName
+        - cost
+        - tokens
+        - inputTokens
+        - outputTokens
+        - agentCount
+        - runCount
+        - agents
+        - modelBreakdown
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        departmentId:
+          type: string
+        departmentName:
+          type: string
+        cost:
+          type: number
+        tokens:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        agentCount:
+          type: integer
+        runCount:
+          type: integer
+        agents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Agent"
+        modelBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelUsage"
+    ModelSummary:
+      type: object
+      required:
+        - id
+        - name
+        - provider
+        - inputPricePerMillion
+        - outputPricePerMillion
+        - cost
+        - tokens
+        - inputTokens
+        - outputTokens
+        - agentCount
+        - runCount
+        - costShare
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+        inputPricePerMillion:
+          type: number
+          description: USD per 1M input tokens
+        outputPricePerMillion:
+          type: number
+          description: USD per 1M output tokens
+        cost:
+          type: number
+        tokens:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        agentCount:
+          type: integer
+        runCount:
+          type: integer
+        costShare:
+          type: number
+    ModelUsage:
+      type: object
+      required:
+        - modelId
+        - modelName
+        - provider
+        - cost
+        - tokens
+      properties:
+        modelId:
+          type: string
+        modelName:
+          type: string
+        provider:
+          type: string
+        cost:
+          type: number
+        tokens:
+          type: integer
+    Agent:
+      type: object
+      required:
+        - id
+        - name
+        - purpose
+        - status
+        - employeeId
+        - employeeName
+        - departmentId
+        - departmentName
+        - modelId
+        - modelName
+        - provider
+        - cost
+        - tokens
+        - inputTokens
+        - outputTokens
+        - runCount
+        - createdAt
+        - lastActiveAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        purpose:
+          type: string
+        status:
+          type: string
+          description: One of active, idle, archived
+        employeeId:
+          type: string
+        employeeName:
+          type: string
+        departmentId:
+          type: string
+        departmentName:
+          type: string
+        modelId:
+          type: string
+        modelName:
+          type: string
+        provider:
+          type: string
+        cost:
+          type: number
+        tokens:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        runCount:
+          type: integer
+        createdAt:
+          type: string
+        lastActiveAt:
+          type: string
+    AgentDetail:
+      type: object
+      required:
+        - id
+        - name
+        - purpose
+        - status
+        - employeeId
+        - employeeName
+        - departmentId
+        - departmentName
+        - modelId
+        - modelName
+        - provider
+        - cost
+        - tokens
+        - inputTokens
+        - outputTokens
+        - runCount
+        - createdAt
+        - lastActiveAt
+        - trends
+        - recentRuns
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        purpose:
+          type: string
+        status:
+          type: string
+        employeeId:
+          type: string
+        employeeName:
+          type: string
+        departmentId:
+          type: string
+        departmentName:
+          type: string
+        modelId:
+          type: string
+        modelName:
+          type: string
+        provider:
+          type: string
+        cost:
+          type: number
+        tokens:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        runCount:
+          type: integer
+        createdAt:
+          type: string
+        lastActiveAt:
+          type: string
+        trends:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendPoint"
+        recentRuns:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentRun"
+    AgentRun:
+      type: object
+      required:
+        - id
+        - timestamp
+        - inputTokens
+        - outputTokens
+        - tokens
+        - cost
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        tokens:
+          type: integer
+        cost:
+          type: number

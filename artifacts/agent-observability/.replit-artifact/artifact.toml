@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Agent Observability"
+version = "1.0.0"
+id = "artifacts/agent-observability"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23277
+
+[services.development]
+run = "pnpm --filter @workspace/agent-observability run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/agent-observability", "run", "build" ]
+publicDir = "artifacts/agent-observability/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23277"
+BASE_PATH = "/"

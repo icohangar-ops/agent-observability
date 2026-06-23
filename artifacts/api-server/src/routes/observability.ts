@@ -1,0 +1,465 @@
+import { Router, type IRouter } from "express";
+import { db, pool } from "@workspace/db";
+import { sql } from "drizzle-orm";
+
+const router: IRouter = Router();
+
+// Cost expression in USD computed from tokens and per-model pricing.
+// input_price/output_price are stored per 1,000,000 tokens.
+const COST_SQL = `(u.input_tokens::numeric / 1000000 * m.input_price_per_million
+  + u.output_tokens::numeric / 1000000 * m.output_price_per_million)`;
+
+function num(v: unknown): number {
+  return v === null || v === undefined ? 0 : Number(v);
+}
+
+router.get("/overview", async (_req, res) => {
+  const totalsQ = await pool.query(`
+    SELECT
+      COALESCE(SUM(${COST_SQL}), 0) AS total_cost,
+      COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS total_tokens,
+      COALESCE(SUM(u.input_tokens), 0) AS total_input_tokens,
+      COALESCE(SUM(u.output_tokens), 0) AS total_output_tokens,
+      COUNT(u.id) AS run_count
+    FROM usage_events u
+    JOIN agents a ON a.id = u.agent_id
+    JOIN models m ON m.id = a.model_id
+  `);
+
+  const countsQ = await pool.query(`
+    SELECT
+      (SELECT COUNT(*) FROM agents) AS agent_count,
+      (SELECT COUNT(*) FROM agents WHERE status = 'active') AS active_agent_count,
+      (SELECT COUNT(*) FROM employees) AS employee_count,
+      (SELECT COUNT(*) FROM departments) AS department_count,
+      (SELECT COUNT(*) FROM models) AS model_count
+  `);
+
+  const topDeptQ = await pool.query(`
+    SELECT d.name AS name, SUM(${COST_SQL}) AS cost
+    FROM usage_events u
+    JOIN agents a ON a.id = u.agent_id
+    JOIN models m ON m.id = a.model_id
+    JOIN employees e ON e.id = a.employee_id
+    JOIN departments d ON d.id = e.department_id
+    GROUP BY d.name ORDER BY cost DESC LIMIT 1
+  `);
+
+  const topModelQ = await pool.query(`
+    SELECT m.name AS name, SUM(${COST_SQL}) AS cost
+    FROM usage_events u
+    JOIN agents a ON a.id = u.agent_id
+    JOIN models m ON m.id = a.model_id
+    GROUP BY m.name ORDER BY cost DESC LIMIT 1
+  `);
+
+  const t = totalsQ.rows[0];
+  const c = countsQ.rows[0];
+  const agentCount = num(c.agent_count);
+  const totalCost = num(t.total_cost);
+
+  res.json({
+    totalCost,
+    totalTokens: num(t.total_tokens),
+    totalInputTokens: num(t.total_input_tokens),
+    totalOutputTokens: num(t.total_output_tokens),
+    agentCount,
+    activeAgentCount: num(c.active_agent_count),
+    employeeCount: num(c.employee_count),
+    departmentCount: num(c.department_count),
+    modelCount: num(c.model_count),
+    runCount: num(t.run_count),
+    avgCostPerAgent: agentCount > 0 ? totalCost / agentCount : 0,
+    topDepartment: topDeptQ.rows[0]?.name ?? null,
+    topModel: topModelQ.rows[0]?.name ?? null,
+  });
+});
+
+router.get("/overview/trends", async (_req, res) => {
+  const q = await pool.query(`
+    SELECT
+      to_char(date_trunc('day', u.timestamp), 'YYYY-MM-DD') AS date,
+      SUM(${COST_SQL}) AS cost,
+      SUM(u.input_tokens + u.output_tokens) AS tokens
+    FROM usage_events u
+    JOIN agents a ON a.id = u.agent_id
+    JOIN models m ON m.id = a.model_id
+    GROUP BY 1 ORDER BY 1 ASC
+  `);
+  res.json(
+    q.rows.map((r) => ({
+      date: r.date,
+      cost: num(r.cost),
+      tokens: num(r.tokens),
+    })),
+  );
+});
+
+router.get("/departments", async (_req, res) => {
+  const q = await pool.query(`
+    SELECT
+      d.id, d.name,
+      COALESCE(SUM(${COST_SQL}), 0) AS cost,
+      COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens,
+      COALESCE(SUM(u.input_tokens), 0) AS input_tokens,
+      COALESCE(SUM(u.output_tokens), 0) AS output_tokens,
+      COUNT(DISTINCT a.id) AS agent_count,
+      COUNT(DISTINCT e.id) AS employee_count,
+      COUNT(u.id) AS run_count
+    FROM departments d
+    LEFT JOIN employees e ON e.department_id = d.id
+    LEFT JOIN agents a ON a.employee_id = e.id
+    LEFT JOIN models m ON m.id = a.model_id
+    LEFT JOIN usage_events u ON u.agent_id = a.id
+    GROUP BY d.id, d.name
+    ORDER BY cost DESC
+  `);
+  const total = q.rows.reduce((s, r) => s + num(r.cost), 0);
+  res.json(
+    q.rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      cost: num(r.cost),
+      tokens: num(r.tokens),
+      inputTokens: num(r.input_tokens),
+      outputTokens: num(r.output_tokens),
+      agentCount: num(r.agent_count),
+      employeeCount: num(r.employee_count),
+      runCount: num(r.run_count),
+      costShare: total > 0 ? num(r.cost) / total : 0,
+    })),
+  );
+});
+
+async function employeeSummaries(whereDept?: string) {
+  const params: string[] = [];
+  let where = "";
+  if (whereDept) {
+    params.push(whereDept);
+    where = `WHERE d.id = $1`;
+  }
+  const q = await pool.query(
+    `
+    SELECT
+      e.id, e.name, e.role, d.id AS department_id, d.name AS department_name,
+      COALESCE(SUM(${COST_SQL}), 0) AS cost,
+      COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens,
+      COALESCE(SUM(u.input_tokens), 0) AS input_tokens,
+      COALESCE(SUM(u.output_tokens), 0) AS output_tokens,
+      COUNT(DISTINCT a.id) AS agent_count,
+      COUNT(u.id) AS run_count
+    FROM employees e
+    JOIN departments d ON d.id = e.department_id
+    LEFT JOIN agents a ON a.employee_id = e.id
+    LEFT JOIN models m ON m.id = a.model_id
+    LEFT JOIN usage_events u ON u.agent_id = a.id
+    ${where}
+    GROUP BY e.id, e.name, e.role, d.id, d.name
+    ORDER BY cost DESC
+  `,
+    params,
+  );
+  return q.rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    role: r.role,
+    departmentId: r.department_id,
+    departmentName: r.department_name,
+    cost: num(r.cost),
+    tokens: num(r.tokens),
+    inputTokens: num(r.input_tokens),
+    outputTokens: num(r.output_tokens),
+    agentCount: num(r.agent_count),
+    runCount: num(r.run_count),
+  }));
+}
+
+async function modelBreakdown(opts: { departmentId?: string; employeeId?: string }) {
+  const params: string[] = [];
+  const conds: string[] = [];
+  if (opts.departmentId) {
+    params.push(opts.departmentId);
+    conds.push(`e.department_id = $${params.length}`);
+  }
+  if (opts.employeeId) {
+    params.push(opts.employeeId);
+    conds.push(`a.employee_id = $${params.length}`);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+  const q = await pool.query(
+    `
+    SELECT m.id AS model_id, m.name AS model_name, m.provider,
+      COALESCE(SUM(${COST_SQL}), 0) AS cost,
+      COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens
+    FROM usage_events u
+    JOIN agents a ON a.id = u.agent_id
+    JOIN employees e ON e.id = a.employee_id
+    JOIN models m ON m.id = a.model_id
+    ${where}
+    GROUP BY m.id, m.name, m.provider
+    ORDER BY cost DESC
+  `,
+    params,
+  );
+  return q.rows.map((r) => ({
+    modelId: r.model_id,
+    modelName: r.model_name,
+    provider: r.provider,
+    cost: num(r.cost),
+    tokens: num(r.tokens),
+  }));
+}
+
+router.get("/departments/:departmentId", async (req, res) => {
+  const { departmentId } = req.params;
+  const deptQ = await pool.query(`SELECT id, name FROM departments WHERE id = $1`, [
+    departmentId,
+  ]);
+  if (deptQ.rows.length === 0) {
+    res.status(404).json({ error: "Department not found" });
+    return;
+  }
+  const employees = await employeeSummaries(departmentId);
+  const models = await modelBreakdown({ departmentId });
+
+  const cost = employees.reduce((s, e) => s + e.cost, 0);
+  const tokens = employees.reduce((s, e) => s + e.tokens, 0);
+  const inputTokens = employees.reduce((s, e) => s + e.inputTokens, 0);
+  const outputTokens = employees.reduce((s, e) => s + e.outputTokens, 0);
+  const agentCount = employees.reduce((s, e) => s + e.agentCount, 0);
+  const runCount = employees.reduce((s, e) => s + e.runCount, 0);
+
+  const totalQ = await pool.query(`
+    SELECT COALESCE(SUM(${COST_SQL}), 0) AS total
+    FROM usage_events u
+    JOIN agents a ON a.id = u.agent_id
+    JOIN models m ON m.id = a.model_id
+  `);
+  const total = num(totalQ.rows[0].total);
+
+  res.json({
+    id: deptQ.rows[0].id,
+    name: deptQ.rows[0].name,
+    cost,
+    tokens,
+    inputTokens,
+    outputTokens,
+    agentCount,
+    employeeCount: employees.length,
+    runCount,
+    costShare: total > 0 ? cost / total : 0,
+    employees,
+    modelBreakdown: models,
+  });
+});
+
+router.get("/employees", async (_req, res) => {
+  res.json(await employeeSummaries());
+});
+
+async function agentRows(opts: { employeeId?: string; agentId?: string }) {
+  const params: string[] = [];
+  const conds: string[] = [];
+  if (opts.employeeId) {
+    params.push(opts.employeeId);
+    conds.push(`a.employee_id = $${params.length}`);
+  }
+  if (opts.agentId) {
+    params.push(opts.agentId);
+    conds.push(`a.id = $${params.length}`);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+  const q = await pool.query(
+    `
+    SELECT
+      a.id, a.name, a.purpose, a.status,
+      e.id AS employee_id, e.name AS employee_name,
+      d.id AS department_id, d.name AS department_name,
+      m.id AS model_id, m.name AS model_name, m.provider,
+      to_char(a.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+      to_char(a.last_active_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS last_active_at,
+      COALESCE(agg.cost, 0) AS cost,
+      COALESCE(agg.tokens, 0) AS tokens,
+      COALESCE(agg.input_tokens, 0) AS input_tokens,
+      COALESCE(agg.output_tokens, 0) AS output_tokens,
+      COALESCE(agg.run_count, 0) AS run_count
+    FROM agents a
+    JOIN employees e ON e.id = a.employee_id
+    JOIN departments d ON d.id = e.department_id
+    JOIN models m ON m.id = a.model_id
+    LEFT JOIN (
+      SELECT u.agent_id,
+        SUM(u.input_tokens::numeric / 1000000 * mm.input_price_per_million
+          + u.output_tokens::numeric / 1000000 * mm.output_price_per_million) AS cost,
+        SUM(u.input_tokens + u.output_tokens) AS tokens,
+        SUM(u.input_tokens) AS input_tokens,
+        SUM(u.output_tokens) AS output_tokens,
+        COUNT(u.id) AS run_count
+      FROM usage_events u
+      JOIN agents aa ON aa.id = u.agent_id
+      JOIN models mm ON mm.id = aa.model_id
+      GROUP BY u.agent_id
+    ) agg ON agg.agent_id = a.id
+    ${where}
+    ORDER BY cost DESC
+  `,
+    params,
+  );
+  return q.rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    purpose: r.purpose,
+    status: r.status,
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    departmentId: r.department_id,
+    departmentName: r.department_name,
+    modelId: r.model_id,
+    modelName: r.model_name,
+    provider: r.provider,
+    cost: num(r.cost),
+    tokens: num(r.tokens),
+    inputTokens: num(r.input_tokens),
+    outputTokens: num(r.output_tokens),
+    runCount: num(r.run_count),
+    createdAt: r.created_at,
+    lastActiveAt: r.last_active_at,
+  }));
+}
+
+router.get("/employees/:employeeId", async (req, res) => {
+  const { employeeId } = req.params;
+  const empQ = await pool.query(
+    `SELECT e.id, e.name, e.role, d.id AS department_id, d.name AS department_name
+     FROM employees e JOIN departments d ON d.id = e.department_id WHERE e.id = $1`,
+    [employeeId],
+  );
+  if (empQ.rows.length === 0) {
+    res.status(404).json({ error: "Employee not found" });
+    return;
+  }
+  const agents = await agentRows({ employeeId });
+  const models = await modelBreakdown({ employeeId });
+
+  const cost = agents.reduce((s, a) => s + a.cost, 0);
+  const tokens = agents.reduce((s, a) => s + a.tokens, 0);
+  const inputTokens = agents.reduce((s, a) => s + a.inputTokens, 0);
+  const outputTokens = agents.reduce((s, a) => s + a.outputTokens, 0);
+  const runCount = agents.reduce((s, a) => s + a.runCount, 0);
+  const e = empQ.rows[0];
+
+  res.json({
+    id: e.id,
+    name: e.name,
+    role: e.role,
+    departmentId: e.department_id,
+    departmentName: e.department_name,
+    cost,
+    tokens,
+    inputTokens,
+    outputTokens,
+    agentCount: agents.length,
+    runCount,
+    agents,
+    modelBreakdown: models,
+  });
+});
+
+router.get("/models", async (_req, res) => {
+  const q = await pool.query(`
+    SELECT m.id, m.name, m.provider,
+      m.input_price_per_million, m.output_price_per_million,
+      COALESCE(SUM(${COST_SQL}), 0) AS cost,
+      COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens,
+      COALESCE(SUM(u.input_tokens), 0) AS input_tokens,
+      COALESCE(SUM(u.output_tokens), 0) AS output_tokens,
+      COUNT(DISTINCT a.id) AS agent_count,
+      COUNT(u.id) AS run_count
+    FROM models m
+    LEFT JOIN agents a ON a.model_id = m.id
+    LEFT JOIN usage_events u ON u.agent_id = a.id
+    GROUP BY m.id, m.name, m.provider, m.input_price_per_million, m.output_price_per_million
+    ORDER BY cost DESC
+  `);
+  const total = q.rows.reduce((s, r) => s + num(r.cost), 0);
+  res.json(
+    q.rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      provider: r.provider,
+      inputPricePerMillion: num(r.input_price_per_million),
+      outputPricePerMillion: num(r.output_price_per_million),
+      cost: num(r.cost),
+      tokens: num(r.tokens),
+      inputTokens: num(r.input_tokens),
+      outputTokens: num(r.output_tokens),
+      agentCount: num(r.agent_count),
+      runCount: num(r.run_count),
+      costShare: total > 0 ? num(r.cost) / total : 0,
+    })),
+  );
+});
+
+router.get("/agents", async (_req, res) => {
+  res.json(await agentRows({}));
+});
+
+router.get("/agents/:agentId", async (req, res) => {
+  const { agentId } = req.params;
+  const rows = await agentRows({ agentId });
+  if (rows.length === 0) {
+    res.status(404).json({ error: "Agent not found" });
+    return;
+  }
+  const agent = rows[0];
+
+  const trendsQ = await pool.query(
+    `
+    SELECT to_char(date_trunc('day', u.timestamp), 'YYYY-MM-DD') AS date,
+      SUM(${COST_SQL}) AS cost,
+      SUM(u.input_tokens + u.output_tokens) AS tokens
+    FROM usage_events u
+    JOIN agents a ON a.id = u.agent_id
+    JOIN models m ON m.id = a.model_id
+    WHERE u.agent_id = $1
+    GROUP BY 1 ORDER BY 1 ASC
+  `,
+    [agentId],
+  );
+
+  const runsQ = await pool.query(
+    `
+    SELECT u.id,
+      to_char(u.timestamp, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS timestamp,
+      u.input_tokens, u.output_tokens,
+      (u.input_tokens + u.output_tokens) AS tokens,
+      ${COST_SQL} AS cost
+    FROM usage_events u
+    JOIN agents a ON a.id = u.agent_id
+    JOIN models m ON m.id = a.model_id
+    WHERE u.agent_id = $1
+    ORDER BY u.timestamp DESC
+    LIMIT 25
+  `,
+    [agentId],
+  );
+
+  res.json({
+    ...agent,
+    trends: trendsQ.rows.map((r) => ({
+      date: r.date,
+      cost: num(r.cost),
+      tokens: num(r.tokens),
+    })),
+    recentRuns: runsQ.rows.map((r) => ({
+      id: String(r.id),
+      timestamp: r.timestamp,
+      inputTokens: num(r.input_tokens),
+      outputTokens: num(r.output_tokens),
+      tokens: num(r.tokens),
+      cost: num(r.cost),
+    })),
+  });
+});
+
+export default router;
