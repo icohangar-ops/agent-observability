@@ -17,11 +17,18 @@ const realFetch = globalThis.fetch;
 let nextDatadog: () => Response = () =>
   new Response(JSON.stringify({ data: [] }), { status: 200 });
 
+// The parsed request body of the most recent Datadog call, so tests can assert
+// what query/time bounds the route forwarded to Datadog.
+let lastDatadogBody: {
+  data?: { attributes?: { filter?: { from?: string; to?: string; query?: string } } };
+} | null = null;
+
 globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
   const u = String(url);
   // Only intercept the Datadog Export API; let everything else hit the network
   // (the test never relies on that path, but it keeps the stub honest).
   if (u.includes("/api/v2/llm-obs/")) {
+    lastDatadogBody = init?.body ? JSON.parse(String(init.body)) : null;
     return nextDatadog();
   }
   return realFetch(u, init);
@@ -34,6 +41,22 @@ interface TraceListResponse {
 
 interface TraceSummaryResponse {
   noData: boolean;
+  spanCount: number;
+  errorCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  avgLatencyMs: number;
+}
+
+interface TraceDetailResponse {
+  traceId: string;
+  noData: boolean;
+  found: boolean;
+  startTime: string | null;
+  endTime: string | null;
+  durationMs: number;
+  spans: Array<{ spanId: string; traceId: string }>;
   spanCount: number;
   errorCount: number;
   inputTokens: number;
@@ -218,5 +241,128 @@ describe("traces routes", () => {
     assert.equal(body.noData, true);
     assert.equal(body.spanCount, 0);
     assert.equal(body.avgLatencyMs, 0);
+  });
+
+  // --- GET /traces/:traceId --------------------------------------------------
+
+  // Three spans of trace "777" returned out of start-time order, plus a span
+  // from a different trace that the route must filter out in-process. start_ns
+  // is nanoseconds; the route orders by start time and computes wall-clock
+  // bounds (min start, max start+latency).
+  const TRACE_SPANS = [
+    {
+      span_id: "mid",
+      trace_id: "777",
+      name: "planner step",
+      span_kind: "agent",
+      status: "error",
+      start_ns: 1_700_000_001_000_000_000, // +1s
+      duration: 2_000_000, // 2 ms
+      metrics: { input_tokens: 20, output_tokens: 0, total_tokens: 20 },
+    },
+    {
+      span_id: "first",
+      trace_id: "777",
+      name: "gpt call",
+      span_kind: "llm",
+      model_name: "gpt-4o",
+      status: "ok",
+      start_ns: 1_700_000_000_000_000_000, // +0s (earliest)
+      duration: 1_000_000, // 1 ms
+      metrics: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+    },
+    {
+      span_id: "last",
+      trace_id: "777",
+      name: "claude call",
+      span_kind: "llm",
+      model_name: "claude-3",
+      status: "ok",
+      start_ns: 1_700_000_002_000_000_000, // +2s (latest)
+      duration: 3_000_000, // 3 ms
+      metrics: { input_tokens: 30, output_tokens: 10, total_tokens: 40 },
+    },
+    {
+      span_id: "other-trace",
+      trace_id: "999",
+      name: "unrelated",
+      span_kind: "llm",
+      status: "ok",
+      start_ns: 1_700_000_003_000_000_000,
+      duration: 9_000_000,
+      metrics: { input_tokens: 99, output_tokens: 99, total_tokens: 198 },
+    },
+  ];
+
+  test("GET /traces/:traceId returns ordered spans, bounds and aggregates", async () => {
+    nextDatadog = datadogSpans(TRACE_SPANS);
+    const { status, body } = await getJson<TraceDetailResponse>(`${base}/traces/777`);
+    assert.equal(status, 200);
+    assert.equal(body.noData, false);
+    assert.equal(body.found, true);
+    assert.equal(body.traceId, "777");
+
+    // Spans of trace 777 only, ordered by start time ascending; the 999 span is
+    // dropped by the in-process trace_id filter.
+    assert.deepEqual(
+      body.spans.map((s) => s.spanId),
+      ["first", "mid", "last"],
+    );
+    assert.ok(body.spans.every((s) => s.traceId === "777"));
+
+    // Aggregates exclude the foreign span.
+    assert.equal(body.spanCount, 3);
+    assert.equal(body.errorCount, 1);
+    assert.equal(body.inputTokens, 60);
+    assert.equal(body.outputTokens, 15);
+    assert.equal(body.totalTokens, 75);
+    // (1 + 2 + 3) ms / 3 spans = 2 ms average.
+    assert.equal(body.avgLatencyMs, 2);
+
+    // Wall-clock bounds: earliest start = first span's start; latest end =
+    // last span's start + its 3 ms latency. Duration spans the whole window.
+    const startMs = 1_700_000_000_000;
+    const endMs = 1_700_000_002_000 + 3;
+    assert.equal(body.startTime, new Date(startMs).toISOString());
+    assert.equal(body.endTime, new Date(endMs).toISOString());
+    assert.equal(body.durationMs, endMs - startMs);
+
+    // The route scopes the Datadog query to the requested trace so the page
+    // limit can't truncate a trace's spans.
+    assert.equal(lastDatadogBody?.data?.attributes?.filter?.query, "@trace_id:777");
+  });
+
+  test("GET /traces/:traceId returns the not-found state for an unknown trace", async () => {
+    // Datadog returns nothing for this trace id.
+    nextDatadog = datadogSpans([]);
+    const { status, body } = await getJson<TraceDetailResponse>(`${base}/traces/does-not-exist`);
+    assert.equal(status, 200);
+    assert.equal(body.found, false);
+    assert.equal(body.traceId, "does-not-exist");
+    assert.deepEqual(body.spans, []);
+    assert.equal(body.spanCount, 0);
+    assert.equal(body.startTime, null);
+    assert.equal(body.endTime, null);
+    assert.equal(body.durationMs, 0);
+    assert.equal(body.avgLatencyMs, 0);
+  });
+
+  test("GET /traces/:traceId forwards the date range to Datadog", async () => {
+    nextDatadog = datadogSpans(TRACE_SPANS);
+    await getJson<TraceDetailResponse>(`${base}/traces/777?from=2026-01-01&to=2026-01-31`);
+
+    // The ISO range is converted to inclusive epoch-millisecond bounds (start of
+    // `from` day through end of `to` day) and sent as strings.
+    const expectedFrom = String(Date.parse("2026-01-01T00:00:00Z"));
+    const expectedTo = String(Date.parse("2026-01-31T23:59:59.999Z"));
+    assert.equal(lastDatadogBody?.data?.attributes?.filter?.from, expectedFrom);
+    assert.equal(lastDatadogBody?.data?.attributes?.filter?.to, expectedTo);
+  });
+
+  test("GET /traces/:traceId defaults to a rolling 30-day window when no range is given", async () => {
+    nextDatadog = datadogSpans(TRACE_SPANS);
+    await getJson<TraceDetailResponse>(`${base}/traces/777`);
+    assert.equal(lastDatadogBody?.data?.attributes?.filter?.from, "now-30d");
+    assert.equal(lastDatadogBody?.data?.attributes?.filter?.to, "now");
   });
 });
