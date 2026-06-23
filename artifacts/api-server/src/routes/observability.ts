@@ -59,7 +59,7 @@ function rangeConds(alias: string, range: DateRange, params: unknown[]): string[
 // Fraction of budget at/above which a department is flagged "near budget".
 const NEAR_BUDGET_THRESHOLD = 0.8;
 
-function budgetStatus(spend: number, amount: number): "ok" | "warning" | "over" {
+export function budgetStatus(spend: number, amount: number): "ok" | "warning" | "over" {
   if (amount <= 0) return "ok";
   const utilization = spend / amount;
   if (utilization >= 1) return "over";

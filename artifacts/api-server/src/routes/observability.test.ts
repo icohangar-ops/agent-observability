@@ -763,6 +763,51 @@ describe("observability routes", () => {
     assert.ok(budgets.some((b) => b.departmentId === "d2" && b.modelId === "m2"));
   });
 
+  test("PUT /budgets treats a model-scoped budget as distinct from the department-wide one", async () => {
+    // d1 already has a department-wide (NULL model) budget (id 1, amount 100).
+    // Adding a model-scoped budget for the same department must INSERT a new
+    // row via IS NOT DISTINCT FROM, not update the NULL-model row.
+    const { status, body } = await sendJson<Record<string, unknown>>(
+      "PUT",
+      `${base}/budgets`,
+      { departmentId: "d1", modelId: "m1", amount: 40 },
+    );
+    assert.equal(status, 200);
+    assert.equal(body.modelId, "m1");
+    assert.equal(body.amount, 40);
+    // The department-wide budget is untouched.
+    const deptWide = budgets.find((b) => b.departmentId === "d1" && b.modelId === null);
+    assert.equal(deptWide?.id, 1);
+    assert.equal(deptWide?.amount, 100);
+    // A separate model-scoped row now exists alongside it.
+    const modelScoped = budgets.find(
+      (b) => b.departmentId === "d1" && b.modelId === "m1",
+    );
+    assert.ok(modelScoped, "expected a new model-scoped budget row");
+    assert.notEqual(modelScoped?.id, deptWide?.id);
+    assert.equal(budgets.filter((b) => b.departmentId === "d1").length, 2);
+  });
+
+  test("PUT /budgets updates the department-wide budget without touching a model-scoped one", async () => {
+    // Seed an existing model-scoped budget for d1 alongside the NULL-model one.
+    budgets.push({ id: 5, departmentId: "d1", modelId: "m1", amount: 40 });
+    nextBudgetId = 6;
+    const { status, body } = await sendJson<Record<string, unknown>>(
+      "PUT",
+      `${base}/budgets`,
+      { departmentId: "d1", amount: 250 },
+    );
+    assert.equal(status, 200);
+    // The NULL-model row (id 1) is updated, not the model-scoped one.
+    assert.equal(body.id, 1);
+    assert.equal(body.amount, 250);
+    assert.equal(body.modelId, null);
+    const modelScoped = budgets.find((b) => b.id === 5);
+    assert.equal(modelScoped?.amount, 40, "model-scoped budget must be untouched");
+    // No new row was inserted; still two budgets for d1.
+    assert.equal(budgets.filter((b) => b.departmentId === "d1").length, 2);
+  });
+
   // --- DELETE /budgets/:id ---
   test("DELETE /budgets/:id removes an existing budget", async () => {
     const res = await fetch(`${base}/budgets/1`, { method: "DELETE" });
