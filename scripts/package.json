@@ -7,6 +7,7 @@
     "hello": "tsx ./src/hello.ts",
     "ingest": "tsx ./src/ingest.ts",
     "seed": "tsx ./src/seed.ts",
+    "seed:traces": "tsx ./src/seed-datadog-traces.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -22,6 +22,8 @@ tags:
     description: Agent inventory with attribution
   - name: budgets
     description: Per-department (and optional per-model) monthly spend budgets
+  - name: traces
+    description: Live agent/LLM execution traces pulled from Datadog LLM Observability
 paths:
   /healthz:
     get:
@@ -310,6 +312,48 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TierSummary"
+  /traces:
+    get:
+      operationId: listTraces
+      tags: [traces]
+      summary: List agent/LLM execution spans
+      description: >-
+        Recent agent/model spans pulled live from Datadog LLM Observability,
+        scoped to the reporting window and optionally filtered by span kind and a
+        free-text query. When the org has no LLM Obs data yet, `noData` is true
+        and `spans` is empty (not an error).
+      parameters:
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
+        - $ref: "#/components/parameters/SpanKind"
+        - $ref: "#/components/parameters/TraceQuery"
+      responses:
+        "200":
+          description: Matching spans (possibly empty)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TraceList"
+  /traces/summary:
+    get:
+      operationId: getTraceSummary
+      tags: [traces]
+      summary: Aggregate totals for the matching spans
+      description: >-
+        Span count, error count, token totals, and average latency for the spans
+        matching the same window and filters as the trace list.
+      parameters:
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
+        - $ref: "#/components/parameters/SpanKind"
+        - $ref: "#/components/parameters/TraceQuery"
+      responses:
+        "200":
+          description: Aggregate trace summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TraceSummary"
 components:
   parameters:
     FromDate:
@@ -333,6 +377,24 @@ components:
       schema:
         type: string
         format: date
+    SpanKind:
+      name: kind
+      in: query
+      required: false
+      description: >-
+        Restrict to a single LLM Obs span kind (e.g. llm, agent, workflow, tool,
+        task, embedding, retrieval). When omitted, all kinds are returned.
+      schema:
+        type: string
+    TraceQuery:
+      name: q
+      in: query
+      required: false
+      description: >-
+        Free-text filter matched against span name, model, provider, kind, and
+        ml_app.
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -950,3 +1012,98 @@ components:
         amount:
           type: number
           description: Monthly budget cap in USD (must be greater than 0)
+    TraceSpan:
+      type: object
+      required:
+        - spanId
+        - traceId
+        - name
+        - kind
+        - model
+        - provider
+        - inputTokens
+        - outputTokens
+        - totalTokens
+        - latencyMs
+        - status
+        - timestamp
+        - mlApp
+        - tags
+      properties:
+        spanId:
+          type: string
+        traceId:
+          type: string
+        parentId:
+          type: ["string", "null"]
+        name:
+          type: string
+        kind:
+          type: string
+          description: LLM Obs span kind (llm, agent, workflow, tool, task, etc.)
+        model:
+          type: ["string", "null"]
+        provider:
+          type: ["string", "null"]
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        totalTokens:
+          type: integer
+        latencyMs:
+          type: number
+          description: Span duration in milliseconds
+        status:
+          type: string
+          description: ok or error
+        timestamp:
+          type: string
+          description: Span start time as an ISO 8601 timestamp
+        mlApp:
+          type: ["string", "null"]
+          description: Datadog ml_app the span was emitted under
+        tags:
+          type: array
+          items:
+            type: string
+    TraceList:
+      type: object
+      required:
+        - noData
+        - spans
+      properties:
+        noData:
+          type: boolean
+          description: True when Datadog has no LLM Obs data yet (empty, not an error)
+        spans:
+          type: array
+          items:
+            $ref: "#/components/schemas/TraceSpan"
+    TraceSummary:
+      type: object
+      required:
+        - noData
+        - spanCount
+        - errorCount
+        - inputTokens
+        - outputTokens
+        - totalTokens
+        - avgLatencyMs
+      properties:
+        noData:
+          type: boolean
+          description: True when Datadog has no LLM Obs data yet (empty, not an error)
+        spanCount:
+          type: integer
+        errorCount:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        totalTokens:
+          type: integer
+        avgLatencyMs:
+          type: number
+          description: Mean span latency in milliseconds across matching spans

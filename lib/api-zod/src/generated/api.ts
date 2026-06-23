@@ -434,3 +434,58 @@ export const ListTiersResponseItem = zod.object({
 export const ListTiersResponse = zod.array(ListTiersResponseItem)
 
 
+/**
+ * Recent agent/model spans pulled live from Datadog LLM Observability, scoped to the reporting window and optionally filtered by span kind and a free-text query. When the org has no LLM Obs data yet, `noData` is true and `spans` is empty (not an error).
+ * @summary List agent/LLM execution spans
+ */
+export const ListTracesQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.'),
+  "kind": zod.coerce.string().optional().describe('Restrict to a single LLM Obs span kind (e.g. llm, agent, workflow, tool, task, embedding, retrieval). When omitted, all kinds are returned.'),
+  "q": zod.coerce.string().optional().describe('Free-text filter matched against span name, model, provider, kind, and ml_app.')
+})
+
+export const ListTracesResponse = zod.object({
+  "noData": zod.boolean().describe('True when Datadog has no LLM Obs data yet (empty, not an error)'),
+  "spans": zod.array(zod.object({
+  "spanId": zod.string(),
+  "traceId": zod.string(),
+  "parentId": zod.string().nullish(),
+  "name": zod.string(),
+  "kind": zod.string().describe('LLM Obs span kind (llm, agent, workflow, tool, task, etc.)'),
+  "model": zod.string().nullable(),
+  "provider": zod.string().nullable(),
+  "inputTokens": zod.number(),
+  "outputTokens": zod.number(),
+  "totalTokens": zod.number(),
+  "latencyMs": zod.number().describe('Span duration in milliseconds'),
+  "status": zod.string().describe('ok or error'),
+  "timestamp": zod.string().describe('Span start time as an ISO 8601 timestamp'),
+  "mlApp": zod.string().nullable().describe('Datadog ml_app the span was emitted under'),
+  "tags": zod.array(zod.string())
+}))
+})
+
+
+/**
+ * Span count, error count, token totals, and average latency for the spans matching the same window and filters as the trace list.
+ * @summary Aggregate totals for the matching spans
+ */
+export const GetTraceSummaryQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.'),
+  "kind": zod.coerce.string().optional().describe('Restrict to a single LLM Obs span kind (e.g. llm, agent, workflow, tool, task, embedding, retrieval). When omitted, all kinds are returned.'),
+  "q": zod.coerce.string().optional().describe('Free-text filter matched against span name, model, provider, kind, and ml_app.')
+})
+
+export const GetTraceSummaryResponse = zod.object({
+  "noData": zod.boolean().describe('True when Datadog has no LLM Obs data yet (empty, not an error)'),
+  "spanCount": zod.number(),
+  "errorCount": zod.number(),
+  "inputTokens": zod.number(),
+  "outputTokens": zod.number(),
+  "totalTokens": zod.number(),
+  "avgLatencyMs": zod.number().describe('Mean span latency in milliseconds across matching spans')
+})
+
+

@@ -75,6 +75,9 @@ alongside the cost data without being copied into the local database.
 - `pnpm --filter @workspace/agent-observability run dev` — run the web app
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/scripts run seed` — seed sample data
+- `pnpm --filter @workspace/scripts run seed:traces` — send sample agent traces to
+  Datadog LLM Observability (labeled `ml_app=agentops-samples`, tag `sample:true`)
+  so the Traces page has live data to display
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API client + Zod schemas
 - `pnpm run typecheck` — full typecheck across all packages
 

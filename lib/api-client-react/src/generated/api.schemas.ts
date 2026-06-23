@@ -254,6 +254,64 @@ export interface TierSummary {
   models: ModelUsage[];
 }
 
+export interface BudgetInput {
+  departmentId: string;
+  /**
+     * Optional model scope; omit or null for a department-wide budget
+     * @nullable
+     */
+  modelId?: string | null;
+  /** Monthly budget cap in USD (must be greater than 0) */
+  amount: number;
+}
+
+export interface TraceSpan {
+  spanId: string;
+  traceId: string;
+  /** @nullable */
+  parentId?: string | null;
+  name: string;
+  /** LLM Obs span kind (llm, agent, workflow, tool, task, etc.) */
+  kind: string;
+  /** @nullable */
+  model: string | null;
+  /** @nullable */
+  provider: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  /** Span duration in milliseconds */
+  latencyMs: number;
+  /** ok or error */
+  status: string;
+  /** Span start time as an ISO 8601 timestamp */
+  timestamp: string;
+  /**
+     * Datadog ml_app the span was emitted under
+     * @nullable
+     */
+  mlApp: string | null;
+  tags: string[];
+}
+
+export interface TraceList {
+  /** True when Datadog has no LLM Obs data yet (empty, not an error) */
+  noData: boolean;
+  spans: TraceSpan[];
+}
+
+export interface TraceSummary {
+  /** True when Datadog has no LLM Obs data yet (empty, not an error) */
+  noData: boolean;
+  spanCount: number;
+  errorCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  /** Mean span latency in milliseconds across matching spans */
+  avgLatencyMs: number;
+}
+
 /**
  * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
  */
@@ -263,6 +321,16 @@ export type FromDateParameter = string;
  * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
  */
 export type ToDateParameter = string;
+
+/**
+ * Restrict to a single LLM Obs span kind (e.g. llm, agent, workflow, tool, task, embedding, retrieval). When omitted, all kinds are returned.
+ */
+export type SpanKindParameter = string;
+
+/**
+ * Free-text filter matched against span name, model, provider, kind, and ml_app.
+ */
+export type TraceQueryParameter = string;
 
 export type GetOverviewParams = {
 /**
@@ -351,16 +419,6 @@ from?: FromDateParameter;
  */
 to?: ToDateParameter;
 };
-export interface BudgetInput {
-  departmentId: string;
-  /**
-     * Optional model scope; omit or null for a department-wide budget
-     * @nullable
-     */
-  modelId?: string | null;
-  /** Monthly budget cap in USD (must be greater than 0) */
-  amount: number;
-}
 
 export type GetAgentParams = {
 /**
@@ -371,5 +429,43 @@ from?: FromDateParameter;
  * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
  */
 to?: ToDateParameter;
+};
+
+export type ListTracesParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+/**
+ * Restrict to a single LLM Obs span kind (e.g. llm, agent, workflow, tool, task, embedding, retrieval). When omitted, all kinds are returned.
+ */
+kind?: SpanKindParameter;
+/**
+ * Free-text filter matched against span name, model, provider, kind, and ml_app.
+ */
+q?: TraceQueryParameter;
+};
+
+export type GetTraceSummaryParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+/**
+ * Restrict to a single LLM Obs span kind (e.g. llm, agent, workflow, tool, task, embedding, retrieval). When omitted, all kinds are returned.
+ */
+kind?: SpanKindParameter;
+/**
+ * Free-text filter matched against span name, model, provider, kind, and ml_app.
+ */
+q?: TraceQueryParameter;
 };
 

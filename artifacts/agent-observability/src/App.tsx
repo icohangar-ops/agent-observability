@@ -15,6 +15,7 @@ import Tiers from "@/pages/tiers";
 import Models from "@/pages/models";
 import Agents from "@/pages/agents";
 import AgentDetail from "@/pages/agent-detail";
+import Traces from "@/pages/traces";
 import Budgets from "@/pages/budgets";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ function Router() {
         <Route path="/models" component={Models} />
         <Route path="/agents" component={Agents} />
         <Route path="/agents/:agentId" component={AgentDetail} />
+        <Route path="/traces" component={Traces} />
         <Route path="/budgets" component={Budgets} />
         <Route component={NotFound} />
       </Switch>

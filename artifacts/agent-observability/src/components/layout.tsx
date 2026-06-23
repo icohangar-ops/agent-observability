@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, Building2, Cpu, Users, Layers, ShieldCheck, Wallet, Moon, Sun } from "lucide-react";
+import { Activity, Building2, Cpu, Users, Layers, ShieldCheck, Wallet, Waypoints, Moon, Sun } from "lucide-react";
 import { Button } from "./ui/button";
 import { DateRangeSelector } from "./date-range-selector";
 
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/tiers", label: "Access Tiers", icon: ShieldCheck },
   { href: "/models", label: "Models", icon: Layers },
   { href: "/agents", label: "Agents", icon: Cpu },
+  { href: "/traces", label: "Traces", icon: Waypoints },
   { href: "/budgets", label: "Budgets", icon: Wallet },
 ];
 

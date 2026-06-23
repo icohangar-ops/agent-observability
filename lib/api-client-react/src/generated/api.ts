@@ -33,15 +33,19 @@ import type {
   GetDepartmentParams,
   GetEmployeeParams,
   GetOverviewParams,
+  GetTraceSummaryParams,
   GetTrendsParams,
   HealthStatus,
   ListAgentsParams,
   ListDepartmentsParams,
   ListEmployeesParams,
   ListModelsParams,
+  ListTracesParams,
   ModelSummary,
   Overview,
   TierSummary,
+  TraceList,
+  TraceSummary,
   TrendPoint
 } from './api.schemas';
 
@@ -1202,6 +1206,176 @@ export function useListTiers<TData = Awaited<ReturnType<typeof listTiers>>, TErr
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListTiersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListTracesUrl = (params?: ListTracesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/traces?${stringifiedParams}` : `/api/traces`
+}
+
+/**
+ * Recent agent/model spans pulled live from Datadog LLM Observability, scoped to the reporting window and optionally filtered by span kind and a free-text query. When the org has no LLM Obs data yet, `noData` is true and `spans` is empty (not an error).
+ * @summary List agent/LLM execution spans
+ */
+export const listTraces = async (params?: ListTracesParams, options?: RequestInit): Promise<TraceList> => {
+
+  return customFetch<TraceList>(getListTracesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTracesQueryKey = (params?: ListTracesParams,) => {
+    return [
+    `/api/traces`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListTracesQueryOptions = <TData = Awaited<ReturnType<typeof listTraces>>, TError = ErrorType<unknown>>(params?: ListTracesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTraces>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTracesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTraces>>> = ({ signal }) => listTraces(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTraces>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTracesQueryResult = NonNullable<Awaited<ReturnType<typeof listTraces>>>
+export type ListTracesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List agent/LLM execution spans
+ */
+
+export function useListTraces<TData = Awaited<ReturnType<typeof listTraces>>, TError = ErrorType<unknown>>(
+ params?: ListTracesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTraces>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTracesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTraceSummaryUrl = (params?: GetTraceSummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/traces/summary?${stringifiedParams}` : `/api/traces/summary`
+}
+
+/**
+ * Span count, error count, token totals, and average latency for the spans matching the same window and filters as the trace list.
+ * @summary Aggregate totals for the matching spans
+ */
+export const getTraceSummary = async (params?: GetTraceSummaryParams, options?: RequestInit): Promise<TraceSummary> => {
+
+  return customFetch<TraceSummary>(getGetTraceSummaryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTraceSummaryQueryKey = (params?: GetTraceSummaryParams,) => {
+    return [
+    `/api/traces/summary`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTraceSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getTraceSummary>>, TError = ErrorType<unknown>>(params?: GetTraceSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTraceSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTraceSummaryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTraceSummary>>> = ({ signal }) => getTraceSummary(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTraceSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTraceSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getTraceSummary>>>
+export type GetTraceSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Aggregate totals for the matching spans
+ */
+
+export function useGetTraceSummary<TData = Awaited<ReturnType<typeof getTraceSummary>>, TError = ErrorType<unknown>>(
+ params?: GetTraceSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTraceSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTraceSummaryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
