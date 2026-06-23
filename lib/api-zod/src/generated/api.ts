@@ -21,6 +21,11 @@ export const HealthCheckResponse = zod.object({
  * Totals for cost and tokens across the whole organization, plus headline counts.
  * @summary Organization observability summary
  */
+export const GetOverviewQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.')
+})
+
 export const GetOverviewResponse = zod.object({
   "totalCost": zod.number().describe('Total spend in USD across all usage'),
   "totalTokens": zod.number(),
@@ -42,6 +47,11 @@ export const GetOverviewResponse = zod.object({
  * Daily time series of cost and token usage across the organization.
  * @summary Cost and token trends over time
  */
+export const GetTrendsQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.')
+})
+
 export const GetTrendsResponseItem = zod.object({
   "date": zod.string().describe('ISO date (YYYY-MM-DD)'),
   "cost": zod.number(),
@@ -54,6 +64,11 @@ export const GetTrendsResponse = zod.array(GetTrendsResponseItem)
  * Cost, token usage, and counts grouped by department.
  * @summary Department breakdown
  */
+export const ListDepartmentsQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.')
+})
+
 export const ListDepartmentsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -117,6 +132,11 @@ export const GetDepartmentResponse = zod.object({
  * Cost, token usage, and agent counts grouped by employee.
  * @summary Employee breakdown
  */
+export const ListEmployeesQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.')
+})
+
 export const ListEmployeesResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -191,6 +211,11 @@ export const GetEmployeeResponse = zod.object({
  * Cost, token usage, and agent counts grouped by model, including per-model pricing.
  * @summary Model breakdown
  */
+export const ListModelsQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.')
+})
+
 export const ListModelsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -213,6 +238,11 @@ export const ListModelsResponse = zod.array(ListModelsResponseItem)
  * All agents with full attribution (employee, department, model) and usage.
  * @summary Agent inventory
  */
+export const ListAgentsQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.')
+})
+
 export const ListAgentsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),

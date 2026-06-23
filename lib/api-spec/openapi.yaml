@@ -40,6 +40,9 @@ paths:
       tags: [overview]
       summary: Organization observability summary
       description: Totals for cost and tokens across the whole organization, plus headline counts.
+      parameters:
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
       responses:
         "200":
           description: Overview summary
@@ -53,6 +56,9 @@ paths:
       tags: [overview]
       summary: Cost and token trends over time
       description: Daily time series of cost and token usage across the organization.
+      parameters:
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
       responses:
         "200":
           description: Daily trend points
@@ -68,6 +74,9 @@ paths:
       tags: [departments]
       summary: Department breakdown
       description: Cost, token usage, and counts grouped by department.
+      parameters:
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
       responses:
         "200":
           description: Departments with aggregates
@@ -108,6 +117,9 @@ paths:
       tags: [employees]
       summary: Employee breakdown
       description: Cost, token usage, and agent counts grouped by employee.
+      parameters:
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
       responses:
         "200":
           description: Employees with aggregates
@@ -148,6 +160,9 @@ paths:
       tags: [models]
       summary: Model breakdown
       description: Cost, token usage, and agent counts grouped by model, including per-model pricing.
+      parameters:
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
       responses:
         "200":
           description: Models with aggregates
@@ -163,6 +178,9 @@ paths:
       tags: [agents]
       summary: Agent inventory
       description: All agents with full attribution (employee, department, model) and usage.
+      parameters:
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
       responses:
         "200":
           description: Agents with attribution
@@ -215,6 +233,28 @@ paths:
                 items:
                   $ref: "#/components/schemas/TierSummary"
 components:
+  parameters:
+    FromDate:
+      name: from
+      in: query
+      required: false
+      description: >-
+        Inclusive start of the reporting window as an ISO date (YYYY-MM-DD).
+        When omitted, aggregation starts from the earliest usage event.
+      schema:
+        type: string
+        format: date
+    ToDate:
+      name: to
+      in: query
+      required: false
+      description: >-
+        Inclusive end of the reporting window as an ISO date (YYYY-MM-DD).
+        Events on this day are included. When omitted, aggregation runs to the
+        latest usage event.
+      schema:
+        type: string
+        format: date
   schemas:
     HealthStatus:
       type: object

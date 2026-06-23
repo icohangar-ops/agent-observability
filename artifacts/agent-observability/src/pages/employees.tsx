@@ -1,4 +1,5 @@
 import { useListEmployees } from "@workspace/api-client-react";
+import { useDateRange } from "@/lib/date-range";
 import { formatUSD, formatTokens, formatNumber } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,7 +8,8 @@ import { Link } from "wouter";
 import { TierBadge } from "@/components/tier-badge";
 
 export default function Employees() {
-  const { data: employees, isLoading } = useListEmployees();
+  const { params } = useDateRange();
+  const { data: employees, isLoading } = useListEmployees(params);
 
   if (isLoading) {
     return (

@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Activity, Building2, Cpu, Users, Layers, ShieldCheck, Moon, Sun } from "lucide-react";
 import { Button } from "./ui/button";
+import { DateRangeSelector } from "./date-range-selector";
 
 const navItems = [
   { href: "/", label: "Overview", icon: Activity },
@@ -52,8 +53,12 @@ export function Layout({ children }: { children: ReactNode }) {
           </Button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto bg-background">
-        {children}
+      <main className="flex-1 overflow-auto bg-background flex flex-col">
+        <header className="sticky top-0 z-20 flex items-center justify-end gap-3 border-b border-border bg-background/80 backdrop-blur px-6 py-3">
+          <span className="mr-auto text-sm font-medium text-muted-foreground">Reporting window</span>
+          <DateRangeSelector />
+        </header>
+        <div className="flex-1">{children}</div>
       </main>
     </div>
   );

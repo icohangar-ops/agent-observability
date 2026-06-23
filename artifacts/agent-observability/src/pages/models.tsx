@@ -1,4 +1,5 @@
 import { useListModels } from "@workspace/api-client-react";
+import { useDateRange } from "@/lib/date-range";
 import { formatUSD, formatTokens, formatPercent, formatNumber } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TierBadge } from "@/components/tier-badge";
 
 export default function Models() {
-  const { data: models, isLoading } = useListModels();
+  const { params } = useDateRange();
+  const { data: models, isLoading } = useListModels(params);
 
   if (isLoading) {
     return (

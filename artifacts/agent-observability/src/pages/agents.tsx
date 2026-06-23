@@ -1,4 +1,5 @@
 import { useListAgents } from "@workspace/api-client-react";
+import { useDateRange } from "@/lib/date-range";
 import { formatUSD, formatTokens, formatNumber } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,7 +12,8 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 
 export default function Agents() {
-  const { data: agents, isLoading } = useListAgents();
+  const { params } = useDateRange();
+  const { data: agents, isLoading } = useListAgents(params);
   const [search, setSearch] = useState("");
 
   if (isLoading) {

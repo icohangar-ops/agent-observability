@@ -25,8 +25,43 @@ const TIER_ORDER: Record<string, number> = {
   routine: 2,
 };
 
-router.get("/overview", async (_req, res) => {
-  const totalsQ = await pool.query(`
+interface DateRange {
+  from: string | null;
+  to: string | null;
+}
+
+// Parse optional `from`/`to` ISO date (YYYY-MM-DD) query params.
+function parseRange(query: Record<string, unknown>): DateRange {
+  const from =
+    typeof query.from === "string" && query.from.trim() !== "" ? query.from.trim() : null;
+  const to =
+    typeof query.to === "string" && query.to.trim() !== "" ? query.to.trim() : null;
+  return { from, to };
+}
+
+// Build SQL conditions constraining a usage_events alias to the date range.
+// Pushes bound params onto `params` and returns the condition fragments so the
+// caller can place them in a WHERE clause or a LEFT JOIN ... ON clause.
+// `to` is treated as an inclusive day (events on that calendar day are kept).
+function rangeConds(alias: string, range: DateRange, params: unknown[]): string[] {
+  const conds: string[] = [];
+  if (range.from) {
+    params.push(range.from);
+    conds.push(`${alias}.timestamp >= $${params.length}::date`);
+  }
+  if (range.to) {
+    params.push(range.to);
+    conds.push(`${alias}.timestamp < ($${params.length}::date + interval '1 day')`);
+  }
+  return conds;
+}
+
+router.get("/overview", async (req, res) => {
+  const range = parseRange(req.query);
+  const totalsParams: unknown[] = [];
+  const totalsWhere = rangeConds("u", range, totalsParams);
+  const totalsQ = await pool.query(
+    `
     SELECT
       COALESCE(SUM(${COST_SQL}), 0) AS total_cost,
       COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS total_tokens,
@@ -36,7 +71,10 @@ router.get("/overview", async (_req, res) => {
     FROM usage_events u
     JOIN agents a ON a.id = u.agent_id
     JOIN models m ON m.id = a.model_id
-  `);
+    ${totalsWhere.length ? `WHERE ${totalsWhere.join(" AND ")}` : ""}
+  `,
+    totalsParams,
+  );
 
   const countsQ = await pool.query(`
     SELECT
@@ -47,23 +85,35 @@ router.get("/overview", async (_req, res) => {
       (SELECT COUNT(*) FROM models) AS model_count
   `);
 
-  const topDeptQ = await pool.query(`
+  const topDeptParams: unknown[] = [];
+  const topDeptWhere = rangeConds("u", range, topDeptParams);
+  const topDeptQ = await pool.query(
+    `
     SELECT d.name AS name, SUM(${COST_SQL}) AS cost
     FROM usage_events u
     JOIN agents a ON a.id = u.agent_id
     JOIN models m ON m.id = a.model_id
     JOIN employees e ON e.id = a.employee_id
     JOIN departments d ON d.id = e.department_id
+    ${topDeptWhere.length ? `WHERE ${topDeptWhere.join(" AND ")}` : ""}
     GROUP BY d.name ORDER BY cost DESC LIMIT 1
-  `);
+  `,
+    topDeptParams,
+  );
 
-  const topModelQ = await pool.query(`
+  const topModelParams: unknown[] = [];
+  const topModelWhere = rangeConds("u", range, topModelParams);
+  const topModelQ = await pool.query(
+    `
     SELECT m.name AS name, SUM(${COST_SQL}) AS cost
     FROM usage_events u
     JOIN agents a ON a.id = u.agent_id
     JOIN models m ON m.id = a.model_id
+    ${topModelWhere.length ? `WHERE ${topModelWhere.join(" AND ")}` : ""}
     GROUP BY m.name ORDER BY cost DESC LIMIT 1
-  `);
+  `,
+    topModelParams,
+  );
 
   const t = totalsQ.rows[0];
   const c = countsQ.rows[0];
@@ -87,8 +137,12 @@ router.get("/overview", async (_req, res) => {
   });
 });
 
-router.get("/overview/trends", async (_req, res) => {
-  const q = await pool.query(`
+router.get("/overview/trends", async (req, res) => {
+  const range = parseRange(req.query);
+  const params: unknown[] = [];
+  const where = rangeConds("u", range, params);
+  const q = await pool.query(
+    `
     SELECT
       to_char(date_trunc('day', u.timestamp), 'YYYY-MM-DD') AS date,
       SUM(${COST_SQL}) AS cost,
@@ -96,8 +150,11 @@ router.get("/overview/trends", async (_req, res) => {
     FROM usage_events u
     JOIN agents a ON a.id = u.agent_id
     JOIN models m ON m.id = a.model_id
+    ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
     GROUP BY 1 ORDER BY 1 ASC
-  `);
+  `,
+    params,
+  );
   res.json(
     q.rows.map((r) => ({
       date: r.date,
@@ -107,8 +164,15 @@ router.get("/overview/trends", async (_req, res) => {
   );
 });
 
-router.get("/departments", async (_req, res) => {
-  const q = await pool.query(`
+router.get("/departments", async (req, res) => {
+  const range = parseRange(req.query);
+  const params: unknown[] = [];
+  const usageConds = rangeConds("u", range, params);
+  const usageJoin = `LEFT JOIN usage_events u ON u.agent_id = a.id${
+    usageConds.length ? ` AND ${usageConds.join(" AND ")}` : ""
+  }`;
+  const q = await pool.query(
+    `
     SELECT
       d.id, d.name,
       COALESCE(SUM(${COST_SQL}), 0) AS cost,
@@ -122,10 +186,12 @@ router.get("/departments", async (_req, res) => {
     LEFT JOIN employees e ON e.department_id = d.id
     LEFT JOIN agents a ON a.employee_id = e.id
     LEFT JOIN models m ON m.id = a.model_id
-    LEFT JOIN usage_events u ON u.agent_id = a.id
+    ${usageJoin}
     GROUP BY d.id, d.name
     ORDER BY cost DESC
-  `);
+  `,
+    params,
+  );
   const total = q.rows.reduce((s, r) => s + num(r.cost), 0);
   res.json(
     q.rows.map((r) => ({
@@ -143,13 +209,17 @@ router.get("/departments", async (_req, res) => {
   );
 });
 
-async function employeeSummaries(whereDept?: string) {
-  const params: string[] = [];
+async function employeeSummaries(whereDept?: string, range?: DateRange) {
+  const params: unknown[] = [];
   let where = "";
   if (whereDept) {
     params.push(whereDept);
-    where = `WHERE d.id = $1`;
+    where = `WHERE d.id = $${params.length}`;
   }
+  const usageConds = range ? rangeConds("u", range, params) : [];
+  const usageJoin = `LEFT JOIN usage_events u ON u.agent_id = a.id${
+    usageConds.length ? ` AND ${usageConds.join(" AND ")}` : ""
+  }`;
   const q = await pool.query(
     `
     SELECT
@@ -164,7 +234,7 @@ async function employeeSummaries(whereDept?: string) {
     JOIN departments d ON d.id = e.department_id
     LEFT JOIN agents a ON a.employee_id = e.id
     LEFT JOIN models m ON m.id = a.model_id
-    LEFT JOIN usage_events u ON u.agent_id = a.id
+    ${usageJoin}
     ${where}
     GROUP BY e.id, e.name, e.role, e.access_tier, d.id, d.name
     ORDER BY cost DESC
@@ -267,12 +337,18 @@ router.get("/departments/:departmentId", async (req, res) => {
   });
 });
 
-router.get("/employees", async (_req, res) => {
-  res.json(await employeeSummaries());
+router.get("/employees", async (req, res) => {
+  res.json(await employeeSummaries(undefined, parseRange(req.query)));
 });
 
-async function agentRows(opts: { employeeId?: string; agentId?: string }) {
-  const params: string[] = [];
+async function agentRows(opts: {
+  employeeId?: string;
+  agentId?: string;
+  range?: DateRange;
+}) {
+  const params: unknown[] = [];
+  const aggConds = opts.range ? rangeConds("u", opts.range, params) : [];
+  const aggWhere = aggConds.length ? `WHERE ${aggConds.join(" AND ")}` : "";
   const conds: string[] = [];
   if (opts.employeeId) {
     params.push(opts.employeeId);
@@ -312,6 +388,7 @@ async function agentRows(opts: { employeeId?: string; agentId?: string }) {
       FROM usage_events u
       JOIN agents aa ON aa.id = u.agent_id
       JOIN models mm ON mm.id = aa.model_id
+      ${aggWhere}
       GROUP BY u.agent_id
     ) agg ON agg.agent_id = a.id
     ${where}
@@ -381,8 +458,15 @@ router.get("/employees/:employeeId", async (req, res) => {
   });
 });
 
-router.get("/models", async (_req, res) => {
-  const q = await pool.query(`
+router.get("/models", async (req, res) => {
+  const range = parseRange(req.query);
+  const params: unknown[] = [];
+  const usageConds = rangeConds("u", range, params);
+  const usageJoin = `LEFT JOIN usage_events u ON u.agent_id = a.id${
+    usageConds.length ? ` AND ${usageConds.join(" AND ")}` : ""
+  }`;
+  const q = await pool.query(
+    `
     SELECT m.id, m.name, m.provider, m.tier,
       m.input_price_per_million, m.output_price_per_million,
       COALESCE(SUM(${COST_SQL}), 0) AS cost,
@@ -393,10 +477,12 @@ router.get("/models", async (_req, res) => {
       COUNT(u.id) AS run_count
     FROM models m
     LEFT JOIN agents a ON a.model_id = m.id
-    LEFT JOIN usage_events u ON u.agent_id = a.id
+    ${usageJoin}
     GROUP BY m.id, m.name, m.provider, m.tier, m.input_price_per_million, m.output_price_per_million
     ORDER BY cost DESC
-  `);
+  `,
+    params,
+  );
   const total = q.rows.reduce((s, r) => s + num(r.cost), 0);
   res.json(
     q.rows.map((r) => ({
@@ -417,8 +503,15 @@ router.get("/models", async (_req, res) => {
   );
 });
 
-router.get("/tiers", async (_req, res) => {
-  const modelsQ = await pool.query(`
+router.get("/tiers", async (req, res) => {
+  const range = parseRange(req.query);
+  const params: unknown[] = [];
+  const usageConds = rangeConds("u", range, params);
+  const usageJoin = `LEFT JOIN usage_events u ON u.agent_id = a.id${
+    usageConds.length ? ` AND ${usageConds.join(" AND ")}` : ""
+  }`;
+  const modelsQ = await pool.query(
+    `
     SELECT m.id, m.name, m.provider, m.tier,
       COALESCE(SUM(${COST_SQL}), 0) AS cost,
       COALESCE(SUM(u.input_tokens + u.output_tokens), 0) AS tokens,
@@ -428,10 +521,12 @@ router.get("/tiers", async (_req, res) => {
       COUNT(u.id) AS run_count
     FROM models m
     LEFT JOIN agents a ON a.model_id = m.id
-    LEFT JOIN usage_events u ON u.agent_id = a.id
+    ${usageJoin}
     GROUP BY m.id, m.name, m.provider, m.tier
     ORDER BY cost DESC
-  `);
+  `,
+    params,
+  );
 
   const empQ = await pool.query(`
     SELECT access_tier AS tier, COUNT(*) AS employee_count
@@ -513,8 +608,8 @@ router.get("/tiers", async (_req, res) => {
   res.json(result);
 });
 
-router.get("/agents", async (_req, res) => {
-  res.json(await agentRows({}));
+router.get("/agents", async (req, res) => {
+  res.json(await agentRows({ range: parseRange(req.query) }));
 });
 
 router.get("/agents/:agentId", async (req, res) => {

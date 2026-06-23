@@ -210,3 +210,79 @@ export interface TierSummary {
   models: ModelUsage[];
 }
 
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+export type FromDateParameter = string;
+
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+export type ToDateParameter = string;
+
+export type GetOverviewParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+};
+
+export type GetTrendsParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+};
+
+export type ListDepartmentsParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+};
+
+export type ListEmployeesParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+};
+
+export type ListModelsParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+};
+
+export type ListAgentsParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+};
+

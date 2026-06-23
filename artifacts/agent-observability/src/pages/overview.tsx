@@ -1,4 +1,5 @@
 import { useGetOverview, useGetTrends, useListDepartments, useListModels } from "@workspace/api-client-react";
+import { useDateRange } from "@/lib/date-range";
 import { formatUSD, formatTokens, formatNumber, formatPercent } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,10 +15,11 @@ import {
 } from "recharts";
 
 export default function Overview() {
-  const { data: overview, isLoading: isOverviewLoading } = useGetOverview();
-  const { data: trends, isLoading: isTrendsLoading } = useGetTrends();
-  const { data: departments, isLoading: isDeptsLoading } = useListDepartments();
-  const { data: models, isLoading: isModelsLoading } = useListModels();
+  const { params } = useDateRange();
+  const { data: overview, isLoading: isOverviewLoading } = useGetOverview(params);
+  const { data: trends, isLoading: isTrendsLoading } = useGetTrends(params);
+  const { data: departments, isLoading: isDeptsLoading } = useListDepartments(params);
+  const { data: models, isLoading: isModelsLoading } = useListModels(params);
 
   if (isOverviewLoading || isDeptsLoading || isModelsLoading) {
     return (

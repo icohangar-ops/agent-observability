@@ -1,4 +1,5 @@
 import { useListDepartments } from "@workspace/api-client-react";
+import { useDateRange } from "@/lib/date-range";
 import { formatUSD, formatTokens, formatPercent, formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 
 export default function Departments() {
-  const { data: departments, isLoading } = useListDepartments();
+  const { params } = useDateRange();
+  const { data: departments, isLoading } = useListDepartments(params);
 
   if (isLoading) {
     return (

@@ -6,6 +6,13 @@ description: How to regenerate the api-spec client/zod reliably in this env
 In this environment, running orval codegen with `prettier: true` hangs
 indefinitely at the "Cleaning output folder" step and never produces output.
 
+Even with `prettier: false`, the run is slow: it can sit at
+"api-client-react Cleaning output folder" for ~90-115s with no further output
+before completing successfully (exit 0). Do NOT assume it has hung and kill it
+early — give it a single uninterrupted run of at least ~2 minutes. Run the
+binary directly (`node node_modules/orval/dist/bin/orval.mjs`) so a wrapper
+timeout doesn't cut it off mid-generation.
+
 **Rule:** Keep `prettier: false` in `lib/api-spec/orval.config.ts`.
 
 **Why:** With prettier enabled, codegen never completes, so the generated
