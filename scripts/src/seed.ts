@@ -1,3 +1,14 @@
+/**
+ * DEV / FALLBACK ONLY — synthetic sample data generator.
+ *
+ * This populates the dashboard tables with a realistic but *fake* dataset so
+ * the app is demoable without a real data source. For real numbers, use the
+ * ingestion path instead (`pnpm --filter @workspace/scripts run ingest`), which
+ * loads the same tables from real source files (see `ingest.ts`).
+ *
+ * Seeded rows leave `usage_events.external_id` null, so a later real ingest can
+ * be layered on without colliding with these synthetic events.
+ */
 import {
   db,
   pool,

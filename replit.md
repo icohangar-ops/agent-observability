@@ -9,7 +9,9 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/scripts run ingest` — ingest real usage from `scripts/data/` into the dashboard tables (idempotent; pass `-- --reset` for a clean full load)
+- `pnpm --filter @workspace/scripts run seed` — DEV/FALLBACK ONLY: load synthetic sample data
+- Required env: `DATABASE_URL` — Postgres connection string; optional `INGEST_DATA_DIR` — override the ingest source directory
 
 ## Stack
 
@@ -22,7 +24,10 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- DB schema (source of truth): `lib/db/src/schema/index.ts`
+- API aggregation queries: `artifacts/api-server/src/routes/observability.ts` (costs derived from tokens × per-model pricing; never stored)
+- Real data ingestion: `scripts/src/ingest.ts` ← reads `scripts/data/` (`models.json` pricing catalog, `directory.json` org/agent registry, `usage-log.ndjson` metered events)
+- Synthetic dev data: `scripts/src/seed.ts`
 
 ## Architecture decisions
 

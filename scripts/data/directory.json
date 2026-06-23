@@ -1,0 +1,1070 @@
+{
+  "departments": [
+    {
+      "id": "dept-eng",
+      "name": "Engineering"
+    },
+    {
+      "id": "dept-sales",
+      "name": "Sales"
+    },
+    {
+      "id": "dept-marketing",
+      "name": "Marketing"
+    },
+    {
+      "id": "dept-support",
+      "name": "Customer Support"
+    },
+    {
+      "id": "dept-finance",
+      "name": "Finance"
+    },
+    {
+      "id": "dept-product",
+      "name": "Product"
+    },
+    {
+      "id": "dept-ops",
+      "name": "Operations"
+    },
+    {
+      "id": "dept-legal",
+      "name": "Legal"
+    }
+  ],
+  "employees": [
+    {
+      "id": "emp-1",
+      "name": "Mateo Garcia",
+      "role": "Engineering Manager",
+      "accessTier": "research",
+      "departmentId": "dept-eng"
+    },
+    {
+      "id": "emp-2",
+      "name": "Sofia Ivanov",
+      "role": "Engineering Manager",
+      "accessTier": "research",
+      "departmentId": "dept-eng"
+    },
+    {
+      "id": "emp-3",
+      "name": "Grace Mensah",
+      "role": "Engineering Manager",
+      "accessTier": "research",
+      "departmentId": "dept-eng"
+    },
+    {
+      "id": "emp-4",
+      "name": "Diego Costa",
+      "role": "QA Engineer",
+      "accessTier": "research",
+      "departmentId": "dept-eng"
+    },
+    {
+      "id": "emp-5",
+      "name": "Diego Brooks",
+      "role": "Staff Engineer",
+      "accessTier": "research",
+      "departmentId": "dept-eng"
+    },
+    {
+      "id": "emp-6",
+      "name": "Hana Lindqvist",
+      "role": "Solutions Engineer",
+      "accessTier": "research",
+      "departmentId": "dept-sales"
+    },
+    {
+      "id": "emp-7",
+      "name": "Noah Fischer",
+      "role": "Account Executive",
+      "accessTier": "routine",
+      "departmentId": "dept-sales"
+    },
+    {
+      "id": "emp-8",
+      "name": "Wei Ahmed",
+      "role": "Sales Development Rep",
+      "accessTier": "research",
+      "departmentId": "dept-sales"
+    },
+    {
+      "id": "emp-9",
+      "name": "Isla Nguyen",
+      "role": "Brand Manager",
+      "accessTier": "research",
+      "departmentId": "dept-marketing"
+    },
+    {
+      "id": "emp-10",
+      "name": "Theo Okafor",
+      "role": "Brand Manager",
+      "accessTier": "research",
+      "departmentId": "dept-marketing"
+    },
+    {
+      "id": "emp-11",
+      "name": "Priya Reyes",
+      "role": "Content Strategist",
+      "accessTier": "research",
+      "departmentId": "dept-marketing"
+    },
+    {
+      "id": "emp-12",
+      "name": "Priya Tanaka",
+      "role": "SEO Specialist",
+      "accessTier": "research",
+      "departmentId": "dept-marketing"
+    },
+    {
+      "id": "emp-13",
+      "name": "Aisha Bianchi",
+      "role": "Customer Success Manager",
+      "accessTier": "routine",
+      "departmentId": "dept-support"
+    },
+    {
+      "id": "emp-14",
+      "name": "Ibrahim Brooks",
+      "role": "Support Lead",
+      "accessTier": "routine",
+      "departmentId": "dept-support"
+    },
+    {
+      "id": "emp-15",
+      "name": "Nina Schneider",
+      "role": "Support Lead",
+      "accessTier": "routine",
+      "departmentId": "dept-support"
+    },
+    {
+      "id": "emp-16",
+      "name": "Freya Costa",
+      "role": "Customer Success Manager",
+      "accessTier": "routine",
+      "departmentId": "dept-support"
+    },
+    {
+      "id": "emp-17",
+      "name": "Elena Khan",
+      "role": "Support Specialist",
+      "accessTier": "routine",
+      "departmentId": "dept-support"
+    },
+    {
+      "id": "emp-18",
+      "name": "Marcus Patel",
+      "role": "FP&A Analyst",
+      "accessTier": "frontier",
+      "departmentId": "dept-finance"
+    },
+    {
+      "id": "emp-19",
+      "name": "Aisha Khan",
+      "role": "FP&A Analyst",
+      "accessTier": "frontier",
+      "departmentId": "dept-finance"
+    },
+    {
+      "id": "emp-20",
+      "name": "Priya Brooks",
+      "role": "Financial Analyst",
+      "accessTier": "frontier",
+      "departmentId": "dept-finance"
+    },
+    {
+      "id": "emp-21",
+      "name": "Mateo Silva",
+      "role": "FP&A Analyst",
+      "accessTier": "frontier",
+      "departmentId": "dept-finance"
+    },
+    {
+      "id": "emp-22",
+      "name": "Lena Reyes",
+      "role": "UX Researcher",
+      "accessTier": "frontier",
+      "departmentId": "dept-product"
+    },
+    {
+      "id": "emp-23",
+      "name": "Kenji Garcia",
+      "role": "UX Researcher",
+      "accessTier": "frontier",
+      "departmentId": "dept-product"
+    },
+    {
+      "id": "emp-24",
+      "name": "Ravi Brooks",
+      "role": "Product Manager",
+      "accessTier": "frontier",
+      "departmentId": "dept-product"
+    },
+    {
+      "id": "emp-25",
+      "name": "Noah Müller",
+      "role": "UX Researcher",
+      "accessTier": "frontier",
+      "departmentId": "dept-product"
+    },
+    {
+      "id": "emp-26",
+      "name": "Kenji Patel",
+      "role": "Operations Analyst",
+      "accessTier": "routine",
+      "departmentId": "dept-ops"
+    },
+    {
+      "id": "emp-27",
+      "name": "Isla Lindqvist",
+      "role": "Procurement Specialist",
+      "accessTier": "routine",
+      "departmentId": "dept-ops"
+    },
+    {
+      "id": "emp-28",
+      "name": "Nina Nguyen",
+      "role": "Procurement Specialist",
+      "accessTier": "routine",
+      "departmentId": "dept-ops"
+    },
+    {
+      "id": "emp-29",
+      "name": "Lena Fischer",
+      "role": "Procurement Specialist",
+      "accessTier": "routine",
+      "departmentId": "dept-ops"
+    },
+    {
+      "id": "emp-30",
+      "name": "Noah Garcia",
+      "role": "Contracts Manager",
+      "accessTier": "frontier",
+      "departmentId": "dept-legal"
+    },
+    {
+      "id": "emp-31",
+      "name": "Ethan Okafor",
+      "role": "Contracts Manager",
+      "accessTier": "frontier",
+      "departmentId": "dept-legal"
+    },
+    {
+      "id": "emp-32",
+      "name": "Chloe Schneider",
+      "role": "Compliance Analyst",
+      "accessTier": "frontier",
+      "departmentId": "dept-legal"
+    },
+    {
+      "id": "emp-33",
+      "name": "Marcus Okafor",
+      "role": "Legal Counsel",
+      "accessTier": "frontier",
+      "departmentId": "dept-legal"
+    },
+    {
+      "id": "emp-34",
+      "name": "Zoe Haddad",
+      "role": "Contracts Manager",
+      "accessTier": "frontier",
+      "departmentId": "dept-legal"
+    }
+  ],
+  "agents": [
+    {
+      "id": "agent-1",
+      "name": "Log Analyzer",
+      "purpose": "Log Analyzer for quarterly reporting",
+      "status": "active",
+      "employeeId": "emp-1",
+      "modelId": "gemini-1-5-pro",
+      "createdAt": "2026-04-18T19:52:49.534Z"
+    },
+    {
+      "id": "agent-2",
+      "name": "Incident Triage Bot",
+      "purpose": "Incident Triage Bot for cross-functional handoffs",
+      "status": "active",
+      "employeeId": "emp-1",
+      "modelId": "gemini-1-5-pro",
+      "createdAt": "2026-06-08T19:52:49.534Z"
+    },
+    {
+      "id": "agent-3",
+      "name": "Log Analyzer",
+      "purpose": "Log Analyzer to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-1",
+      "modelId": "llama-3-1-70b",
+      "createdAt": "2026-05-13T19:52:49.534Z"
+    },
+    {
+      "id": "agent-4",
+      "name": "Docs Writer",
+      "purpose": "Docs Writer across the customer lifecycle",
+      "status": "archived",
+      "employeeId": "emp-1",
+      "modelId": "claude-3-haiku",
+      "createdAt": "2026-02-26T19:52:49.534Z"
+    },
+    {
+      "id": "agent-5",
+      "name": "Incident Triage Bot",
+      "purpose": "Incident Triage Bot to cut manual review time",
+      "status": "active",
+      "employeeId": "emp-2",
+      "modelId": "llama-3-1-70b",
+      "createdAt": "2026-03-04T19:52:49.534Z"
+    },
+    {
+      "id": "agent-6",
+      "name": "Log Analyzer",
+      "purpose": "Log Analyzer to accelerate response times",
+      "status": "idle",
+      "employeeId": "emp-2",
+      "modelId": "perplexity-sonar-large",
+      "createdAt": "2026-05-23T19:52:49.534Z"
+    },
+    {
+      "id": "agent-7",
+      "name": "Docs Writer",
+      "purpose": "Docs Writer to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-2",
+      "modelId": "baseten-router",
+      "createdAt": "2026-03-05T19:52:49.534Z"
+    },
+    {
+      "id": "agent-8",
+      "name": "Test Generator",
+      "purpose": "Test Generator to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-3",
+      "modelId": "perplexity-sonar-large",
+      "createdAt": "2026-02-25T19:52:49.534Z"
+    },
+    {
+      "id": "agent-9",
+      "name": "Code Review Assistant",
+      "purpose": "Code Review Assistant to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-3",
+      "modelId": "gemini-1-5-pro",
+      "createdAt": "2026-04-09T19:52:49.534Z"
+    },
+    {
+      "id": "agent-10",
+      "name": "PR Summarizer",
+      "purpose": "PR Summarizer for cross-functional handoffs",
+      "status": "active",
+      "employeeId": "emp-3",
+      "modelId": "perplexity-sonar-large",
+      "createdAt": "2026-03-27T19:52:49.534Z"
+    },
+    {
+      "id": "agent-11",
+      "name": "Incident Triage Bot",
+      "purpose": "Incident Triage Bot for the daily operations workflow",
+      "status": "idle",
+      "employeeId": "emp-4",
+      "modelId": "claude-3-haiku",
+      "createdAt": "2026-06-08T19:52:49.534Z"
+    },
+    {
+      "id": "agent-12",
+      "name": "PR Summarizer",
+      "purpose": "PR Summarizer across the customer lifecycle",
+      "status": "idle",
+      "employeeId": "emp-4",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-04-29T19:52:49.534Z"
+    },
+    {
+      "id": "agent-13",
+      "name": "Code Review Assistant",
+      "purpose": "Code Review Assistant to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-4",
+      "modelId": "gemini-1-5-pro",
+      "createdAt": "2026-02-25T19:52:49.534Z"
+    },
+    {
+      "id": "agent-14",
+      "name": "PR Summarizer",
+      "purpose": "PR Summarizer for the daily operations workflow",
+      "status": "active",
+      "employeeId": "emp-4",
+      "modelId": "baseten-router",
+      "createdAt": "2026-03-16T19:52:49.534Z"
+    },
+    {
+      "id": "agent-15",
+      "name": "Log Analyzer",
+      "purpose": "Log Analyzer for the daily operations workflow",
+      "status": "active",
+      "employeeId": "emp-5",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-05-05T19:52:49.534Z"
+    },
+    {
+      "id": "agent-16",
+      "name": "Log Analyzer",
+      "purpose": "Log Analyzer for the daily operations workflow",
+      "status": "active",
+      "employeeId": "emp-5",
+      "modelId": "perplexity-sonar-large",
+      "createdAt": "2026-03-19T19:52:49.534Z"
+    },
+    {
+      "id": "agent-17",
+      "name": "Proposal Drafter",
+      "purpose": "Proposal Drafter for quarterly reporting",
+      "status": "active",
+      "employeeId": "emp-6",
+      "modelId": "gemini-1-5-pro",
+      "createdAt": "2026-04-17T19:52:49.534Z"
+    },
+    {
+      "id": "agent-18",
+      "name": "Email Outreach Agent",
+      "purpose": "Email Outreach Agent for the daily operations workflow",
+      "status": "active",
+      "employeeId": "emp-6",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-05-10T19:52:49.534Z"
+    },
+    {
+      "id": "agent-19",
+      "name": "CRM Enricher",
+      "purpose": "CRM Enricher to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-6",
+      "modelId": "perplexity-sonar-large",
+      "createdAt": "2026-02-26T19:52:49.534Z"
+    },
+    {
+      "id": "agent-20",
+      "name": "CRM Enricher",
+      "purpose": "CRM Enricher across the customer lifecycle",
+      "status": "idle",
+      "employeeId": "emp-7",
+      "modelId": "baseten-router",
+      "createdAt": "2026-05-06T19:52:49.534Z"
+    },
+    {
+      "id": "agent-21",
+      "name": "Email Outreach Agent",
+      "purpose": "Email Outreach Agent for cross-functional handoffs",
+      "status": "active",
+      "employeeId": "emp-7",
+      "modelId": "baseten-router",
+      "createdAt": "2026-06-09T19:52:49.534Z"
+    },
+    {
+      "id": "agent-22",
+      "name": "Call Summarizer",
+      "purpose": "Call Summarizer to reduce repetitive workload",
+      "status": "archived",
+      "employeeId": "emp-7",
+      "modelId": "llama-3-1-70b",
+      "createdAt": "2026-03-04T19:52:49.534Z"
+    },
+    {
+      "id": "agent-23",
+      "name": "Proposal Drafter",
+      "purpose": "Proposal Drafter for quarterly reporting",
+      "status": "idle",
+      "employeeId": "emp-8",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-04-13T19:52:49.534Z"
+    },
+    {
+      "id": "agent-24",
+      "name": "Proposal Drafter",
+      "purpose": "Proposal Drafter to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-8",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-03-12T19:52:49.534Z"
+    },
+    {
+      "id": "agent-25",
+      "name": "Social Scheduler",
+      "purpose": "Social Scheduler to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-9",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-04-25T19:52:49.534Z"
+    },
+    {
+      "id": "agent-26",
+      "name": "SEO Optimizer",
+      "purpose": "SEO Optimizer to accelerate response times",
+      "status": "idle",
+      "employeeId": "emp-9",
+      "modelId": "gemini-1-5-pro",
+      "createdAt": "2026-06-12T19:52:49.534Z"
+    },
+    {
+      "id": "agent-27",
+      "name": "Campaign Analyzer",
+      "purpose": "Campaign Analyzer for cross-functional handoffs",
+      "status": "active",
+      "employeeId": "emp-9",
+      "modelId": "llama-3-1-70b",
+      "createdAt": "2026-06-10T19:52:49.534Z"
+    },
+    {
+      "id": "agent-28",
+      "name": "Content Generator",
+      "purpose": "Content Generator for the daily operations workflow",
+      "status": "idle",
+      "employeeId": "emp-9",
+      "modelId": "llama-3-1-70b",
+      "createdAt": "2026-04-22T19:52:49.534Z"
+    },
+    {
+      "id": "agent-29",
+      "name": "Content Generator",
+      "purpose": "Content Generator for quarterly reporting",
+      "status": "archived",
+      "employeeId": "emp-10",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-03-26T19:52:49.534Z"
+    },
+    {
+      "id": "agent-30",
+      "name": "SEO Optimizer",
+      "purpose": "SEO Optimizer to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-10",
+      "modelId": "perplexity-sonar-large",
+      "createdAt": "2026-05-31T19:52:49.534Z"
+    },
+    {
+      "id": "agent-31",
+      "name": "SEO Optimizer",
+      "purpose": "SEO Optimizer for cross-functional handoffs",
+      "status": "idle",
+      "employeeId": "emp-10",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-03-16T19:52:49.534Z"
+    },
+    {
+      "id": "agent-32",
+      "name": "Social Scheduler",
+      "purpose": "Social Scheduler to reduce repetitive workload",
+      "status": "idle",
+      "employeeId": "emp-10",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-05-08T19:52:49.534Z"
+    },
+    {
+      "id": "agent-33",
+      "name": "Content Generator",
+      "purpose": "Content Generator across the customer lifecycle",
+      "status": "active",
+      "employeeId": "emp-11",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-06-12T19:52:49.534Z"
+    },
+    {
+      "id": "agent-34",
+      "name": "Content Generator",
+      "purpose": "Content Generator to cut manual review time",
+      "status": "active",
+      "employeeId": "emp-11",
+      "modelId": "claude-3-haiku",
+      "createdAt": "2026-06-04T19:52:49.534Z"
+    },
+    {
+      "id": "agent-35",
+      "name": "SEO Optimizer",
+      "purpose": "SEO Optimizer for cross-functional handoffs",
+      "status": "idle",
+      "employeeId": "emp-12",
+      "modelId": "baseten-router",
+      "createdAt": "2026-04-09T19:52:49.534Z"
+    },
+    {
+      "id": "agent-36",
+      "name": "Ticket Classifier",
+      "purpose": "Ticket Classifier to cut manual review time",
+      "status": "active",
+      "employeeId": "emp-13",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-04-28T19:52:49.534Z"
+    },
+    {
+      "id": "agent-37",
+      "name": "Knowledge Base Bot",
+      "purpose": "Knowledge Base Bot to accelerate response times",
+      "status": "archived",
+      "employeeId": "emp-13",
+      "modelId": "llama-3-1-70b",
+      "createdAt": "2026-06-02T19:52:49.534Z"
+    },
+    {
+      "id": "agent-38",
+      "name": "Knowledge Base Bot",
+      "purpose": "Knowledge Base Bot across the customer lifecycle",
+      "status": "active",
+      "employeeId": "emp-13",
+      "modelId": "baseten-router",
+      "createdAt": "2026-03-25T19:52:49.534Z"
+    },
+    {
+      "id": "agent-39",
+      "name": "Escalation Router",
+      "purpose": "Escalation Router for quarterly reporting",
+      "status": "active",
+      "employeeId": "emp-13",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-03-27T19:52:49.534Z"
+    },
+    {
+      "id": "agent-40",
+      "name": "Response Drafter",
+      "purpose": "Response Drafter to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-14",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-06-12T19:52:49.534Z"
+    },
+    {
+      "id": "agent-41",
+      "name": "Response Drafter",
+      "purpose": "Response Drafter for quarterly reporting",
+      "status": "archived",
+      "employeeId": "emp-14",
+      "modelId": "baseten-router",
+      "createdAt": "2026-04-22T19:52:49.534Z"
+    },
+    {
+      "id": "agent-42",
+      "name": "Ticket Classifier",
+      "purpose": "Ticket Classifier to cut manual review time",
+      "status": "active",
+      "employeeId": "emp-14",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-03-01T19:52:49.534Z"
+    },
+    {
+      "id": "agent-43",
+      "name": "Escalation Router",
+      "purpose": "Escalation Router across the customer lifecycle",
+      "status": "archived",
+      "employeeId": "emp-15",
+      "modelId": "baseten-router",
+      "createdAt": "2026-03-13T19:52:49.534Z"
+    },
+    {
+      "id": "agent-44",
+      "name": "Sentiment Monitor",
+      "purpose": "Sentiment Monitor across the customer lifecycle",
+      "status": "active",
+      "employeeId": "emp-15",
+      "modelId": "llama-3-1-70b",
+      "createdAt": "2026-03-25T19:52:49.534Z"
+    },
+    {
+      "id": "agent-45",
+      "name": "Ticket Classifier",
+      "purpose": "Ticket Classifier to cut manual review time",
+      "status": "idle",
+      "employeeId": "emp-15",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-05-18T19:52:49.534Z"
+    },
+    {
+      "id": "agent-46",
+      "name": "Response Drafter",
+      "purpose": "Response Drafter to cut manual review time",
+      "status": "active",
+      "employeeId": "emp-16",
+      "modelId": "claude-3-haiku",
+      "createdAt": "2026-05-06T19:52:49.534Z"
+    },
+    {
+      "id": "agent-47",
+      "name": "Response Drafter",
+      "purpose": "Response Drafter for the daily operations workflow",
+      "status": "active",
+      "employeeId": "emp-16",
+      "modelId": "claude-3-haiku",
+      "createdAt": "2026-05-04T19:52:49.534Z"
+    },
+    {
+      "id": "agent-48",
+      "name": "Knowledge Base Bot",
+      "purpose": "Knowledge Base Bot to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-16",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-05-11T19:52:49.534Z"
+    },
+    {
+      "id": "agent-49",
+      "name": "Escalation Router",
+      "purpose": "Escalation Router to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-17",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-04-19T19:52:49.534Z"
+    },
+    {
+      "id": "agent-50",
+      "name": "Escalation Router",
+      "purpose": "Escalation Router for cross-functional handoffs",
+      "status": "idle",
+      "employeeId": "emp-17",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-04-24T19:52:49.534Z"
+    },
+    {
+      "id": "agent-51",
+      "name": "Sentiment Monitor",
+      "purpose": "Sentiment Monitor to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-17",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-04-03T19:52:49.534Z"
+    },
+    {
+      "id": "agent-52",
+      "name": "Knowledge Base Bot",
+      "purpose": "Knowledge Base Bot to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-17",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-04-01T19:52:49.534Z"
+    },
+    {
+      "id": "agent-53",
+      "name": "Spend Analyzer",
+      "purpose": "Spend Analyzer to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-18",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-06-11T19:52:49.534Z"
+    },
+    {
+      "id": "agent-54",
+      "name": "Report Compiler",
+      "purpose": "Report Compiler to accelerate response times",
+      "status": "active",
+      "employeeId": "emp-18",
+      "modelId": "claude-3-5-sonnet",
+      "createdAt": "2026-03-12T19:52:49.534Z"
+    },
+    {
+      "id": "agent-55",
+      "name": "Spend Analyzer",
+      "purpose": "Spend Analyzer for cross-functional handoffs",
+      "status": "idle",
+      "employeeId": "emp-18",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-04-26T19:52:49.534Z"
+    },
+    {
+      "id": "agent-56",
+      "name": "Forecast Modeler",
+      "purpose": "Forecast Modeler to reduce repetitive workload",
+      "status": "idle",
+      "employeeId": "emp-19",
+      "modelId": "claude-3-5-sonnet",
+      "createdAt": "2026-05-24T19:52:49.534Z"
+    },
+    {
+      "id": "agent-57",
+      "name": "Invoice Reconciler",
+      "purpose": "Invoice Reconciler to accelerate response times",
+      "status": "idle",
+      "employeeId": "emp-19",
+      "modelId": "gpt-4o",
+      "createdAt": "2026-04-08T19:52:49.534Z"
+    },
+    {
+      "id": "agent-58",
+      "name": "Spend Analyzer",
+      "purpose": "Spend Analyzer to support the team's weekly cadence",
+      "status": "idle",
+      "employeeId": "emp-20",
+      "modelId": "llama-3-1-70b",
+      "createdAt": "2026-03-21T19:52:49.534Z"
+    },
+    {
+      "id": "agent-59",
+      "name": "Spend Analyzer",
+      "purpose": "Spend Analyzer for cross-functional handoffs",
+      "status": "active",
+      "employeeId": "emp-20",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-05-06T19:52:49.534Z"
+    },
+    {
+      "id": "agent-60",
+      "name": "Expense Auditor",
+      "purpose": "Expense Auditor to reduce repetitive workload",
+      "status": "idle",
+      "employeeId": "emp-21",
+      "modelId": "claude-3-5-sonnet",
+      "createdAt": "2026-02-23T19:52:49.534Z"
+    },
+    {
+      "id": "agent-61",
+      "name": "Report Compiler",
+      "purpose": "Report Compiler across the customer lifecycle",
+      "status": "idle",
+      "employeeId": "emp-21",
+      "modelId": "gpt-4o",
+      "createdAt": "2026-05-21T19:52:49.534Z"
+    },
+    {
+      "id": "agent-62",
+      "name": "User Interview Analyzer",
+      "purpose": "User Interview Analyzer to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-22",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-04-08T19:52:49.534Z"
+    },
+    {
+      "id": "agent-63",
+      "name": "Feedback Synthesizer",
+      "purpose": "Feedback Synthesizer to accelerate response times",
+      "status": "active",
+      "employeeId": "emp-22",
+      "modelId": "claude-3-5-sonnet",
+      "createdAt": "2026-04-01T19:52:49.534Z"
+    },
+    {
+      "id": "agent-64",
+      "name": "Roadmap Assistant",
+      "purpose": "Roadmap Assistant to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-22",
+      "modelId": "gpt-4o",
+      "createdAt": "2026-06-10T19:52:49.534Z"
+    },
+    {
+      "id": "agent-65",
+      "name": "Feedback Synthesizer",
+      "purpose": "Feedback Synthesizer to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-23",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-04-26T19:52:49.534Z"
+    },
+    {
+      "id": "agent-66",
+      "name": "User Interview Analyzer",
+      "purpose": "User Interview Analyzer for cross-functional handoffs",
+      "status": "active",
+      "employeeId": "emp-24",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-03-21T19:52:49.534Z"
+    },
+    {
+      "id": "agent-67",
+      "name": "Roadmap Assistant",
+      "purpose": "Roadmap Assistant for cross-functional handoffs",
+      "status": "archived",
+      "employeeId": "emp-24",
+      "modelId": "gemini-1-5-pro",
+      "createdAt": "2026-04-19T19:52:49.534Z"
+    },
+    {
+      "id": "agent-68",
+      "name": "Roadmap Assistant",
+      "purpose": "Roadmap Assistant for the daily operations workflow",
+      "status": "active",
+      "employeeId": "emp-24",
+      "modelId": "claude-3-5-sonnet",
+      "createdAt": "2026-06-07T19:52:49.534Z"
+    },
+    {
+      "id": "agent-69",
+      "name": "Feedback Synthesizer",
+      "purpose": "Feedback Synthesizer to cut manual review time",
+      "status": "archived",
+      "employeeId": "emp-25",
+      "modelId": "gpt-4o",
+      "createdAt": "2026-05-28T19:52:49.534Z"
+    },
+    {
+      "id": "agent-70",
+      "name": "Roadmap Assistant",
+      "purpose": "Roadmap Assistant to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-25",
+      "modelId": "gemini-1-5-pro",
+      "createdAt": "2026-04-18T19:52:49.534Z"
+    },
+    {
+      "id": "agent-71",
+      "name": "Vendor Researcher",
+      "purpose": "Vendor Researcher for the daily operations workflow",
+      "status": "active",
+      "employeeId": "emp-26",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-04-21T19:52:49.534Z"
+    },
+    {
+      "id": "agent-72",
+      "name": "Inventory Forecaster",
+      "purpose": "Inventory Forecaster to cut manual review time",
+      "status": "idle",
+      "employeeId": "emp-26",
+      "modelId": "claude-3-haiku",
+      "createdAt": "2026-05-02T19:52:49.534Z"
+    },
+    {
+      "id": "agent-73",
+      "name": "Process Auditor",
+      "purpose": "Process Auditor to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-26",
+      "modelId": "baseten-router",
+      "createdAt": "2026-03-22T19:52:49.534Z"
+    },
+    {
+      "id": "agent-74",
+      "name": "Inventory Forecaster",
+      "purpose": "Inventory Forecaster to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-27",
+      "modelId": "llama-3-1-70b",
+      "createdAt": "2026-02-26T19:52:49.534Z"
+    },
+    {
+      "id": "agent-75",
+      "name": "Vendor Researcher",
+      "purpose": "Vendor Researcher for quarterly reporting",
+      "status": "idle",
+      "employeeId": "emp-27",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-04-27T19:52:49.534Z"
+    },
+    {
+      "id": "agent-76",
+      "name": "Inventory Forecaster",
+      "purpose": "Inventory Forecaster to accelerate response times",
+      "status": "active",
+      "employeeId": "emp-28",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-04-07T19:52:49.534Z"
+    },
+    {
+      "id": "agent-77",
+      "name": "Process Auditor",
+      "purpose": "Process Auditor across the customer lifecycle",
+      "status": "active",
+      "employeeId": "emp-29",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-04-06T19:52:49.534Z"
+    },
+    {
+      "id": "agent-78",
+      "name": "Process Auditor",
+      "purpose": "Process Auditor for the daily operations workflow",
+      "status": "active",
+      "employeeId": "emp-29",
+      "modelId": "claude-3-haiku",
+      "createdAt": "2026-06-11T19:52:49.534Z"
+    },
+    {
+      "id": "agent-79",
+      "name": "NDA Drafter",
+      "purpose": "NDA Drafter to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-30",
+      "modelId": "gpt-4o",
+      "createdAt": "2026-02-26T19:52:49.534Z"
+    },
+    {
+      "id": "agent-80",
+      "name": "NDA Drafter",
+      "purpose": "NDA Drafter for the daily operations workflow",
+      "status": "active",
+      "employeeId": "emp-31",
+      "modelId": "gpt-4o-mini",
+      "createdAt": "2026-06-06T19:52:49.534Z"
+    },
+    {
+      "id": "agent-81",
+      "name": "Contract Reviewer",
+      "purpose": "Contract Reviewer to support the team's weekly cadence",
+      "status": "active",
+      "employeeId": "emp-31",
+      "modelId": "claude-3-5-sonnet",
+      "createdAt": "2026-04-06T19:52:49.534Z"
+    },
+    {
+      "id": "agent-82",
+      "name": "Contract Reviewer",
+      "purpose": "Contract Reviewer to cut manual review time",
+      "status": "idle",
+      "employeeId": "emp-32",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-06-09T19:52:49.534Z"
+    },
+    {
+      "id": "agent-83",
+      "name": "Contract Reviewer",
+      "purpose": "Contract Reviewer to cut manual review time",
+      "status": "idle",
+      "employeeId": "emp-32",
+      "modelId": "openrouter-auto",
+      "createdAt": "2026-03-26T19:52:49.534Z"
+    },
+    {
+      "id": "agent-84",
+      "name": "NDA Drafter",
+      "purpose": "NDA Drafter to reduce repetitive workload",
+      "status": "active",
+      "employeeId": "emp-32",
+      "modelId": "gpt-4o",
+      "createdAt": "2026-04-29T19:52:49.534Z"
+    },
+    {
+      "id": "agent-85",
+      "name": "Clause Extractor",
+      "purpose": "Clause Extractor across the customer lifecycle",
+      "status": "archived",
+      "employeeId": "emp-33",
+      "modelId": "claude-3-haiku",
+      "createdAt": "2026-05-18T19:52:49.534Z"
+    },
+    {
+      "id": "agent-86",
+      "name": "Compliance Checker",
+      "purpose": "Compliance Checker across the customer lifecycle",
+      "status": "archived",
+      "employeeId": "emp-33",
+      "modelId": "baseten-router",
+      "createdAt": "2026-03-07T19:52:49.534Z"
+    },
+    {
+      "id": "agent-87",
+      "name": "Compliance Checker",
+      "purpose": "Compliance Checker to accelerate response times",
+      "status": "active",
+      "employeeId": "emp-33",
+      "modelId": "gemini-1-5-pro",
+      "createdAt": "2026-04-01T19:52:49.534Z"
+    },
+    {
+      "id": "agent-88",
+      "name": "Clause Extractor",
+      "purpose": "Clause Extractor to accelerate response times",
+      "status": "idle",
+      "employeeId": "emp-34",
+      "modelId": "gpt-4o",
+      "createdAt": "2026-03-14T19:52:49.534Z"
+    }
+  ]
+}

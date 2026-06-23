@@ -1,0 +1,74 @@
+[
+  {
+    "id": "gpt-4o",
+    "name": "GPT-4o",
+    "provider": "OpenAI",
+    "tier": "frontier",
+    "inputPricePerMillion": "2.5000",
+    "outputPricePerMillion": "10.0000"
+  },
+  {
+    "id": "claude-3-5-sonnet",
+    "name": "Claude 3.5 Sonnet",
+    "provider": "Anthropic",
+    "tier": "frontier",
+    "inputPricePerMillion": "3.0000",
+    "outputPricePerMillion": "15.0000"
+  },
+  {
+    "id": "perplexity-sonar-large",
+    "name": "Perplexity Sonar Large",
+    "provider": "Perplexity",
+    "tier": "research",
+    "inputPricePerMillion": "1.0000",
+    "outputPricePerMillion": "1.0000"
+  },
+  {
+    "id": "gemini-1-5-pro",
+    "name": "Gemini 1.5 Pro",
+    "provider": "Google",
+    "tier": "research",
+    "inputPricePerMillion": "1.2500",
+    "outputPricePerMillion": "5.0000"
+  },
+  {
+    "id": "openrouter-auto",
+    "name": "OpenRouter (Auto Router)",
+    "provider": "OpenRouter",
+    "tier": "routine",
+    "inputPricePerMillion": "0.3000",
+    "outputPricePerMillion": "0.6000"
+  },
+  {
+    "id": "baseten-router",
+    "name": "Baseten Model Router",
+    "provider": "Baseten",
+    "tier": "routine",
+    "inputPricePerMillion": "0.2000",
+    "outputPricePerMillion": "0.4000"
+  },
+  {
+    "id": "gpt-4o-mini",
+    "name": "GPT-4o mini",
+    "provider": "OpenAI",
+    "tier": "routine",
+    "inputPricePerMillion": "0.1500",
+    "outputPricePerMillion": "0.6000"
+  },
+  {
+    "id": "claude-3-haiku",
+    "name": "Claude 3 Haiku",
+    "provider": "Anthropic",
+    "tier": "routine",
+    "inputPricePerMillion": "0.2500",
+    "outputPricePerMillion": "1.2500"
+  },
+  {
+    "id": "llama-3-1-70b",
+    "name": "Llama 3.1 70B",
+    "provider": "Meta",
+    "tier": "routine",
+    "inputPricePerMillion": "0.5000",
+    "outputPricePerMillion": "0.7500"
+  }
+]

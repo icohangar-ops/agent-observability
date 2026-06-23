@@ -67,6 +67,10 @@ export const usageEventsTable = pgTable(
   "usage_events",
   {
     id: serial("id").primaryKey(),
+    // Stable id from the source export/log (e.g. a provider request id). Lets
+    // ingestion be idempotent/incremental: re-running the same export does not
+    // duplicate rows. Null for synthetically seeded dev data.
+    externalId: text("external_id").unique(),
     agentId: text("agent_id")
       .notNull()
       .references(() => agentsTable.id),

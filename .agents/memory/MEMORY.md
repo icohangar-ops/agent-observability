@@ -1,2 +1,3 @@
 - [Orval codegen quirk](orval-codegen.md) — keep prettier disabled; orval ~100s must run sync in one call (clean:true deletes files); run typecheck:libs after.
 - [API server routing & dev loop](api-server-dev.md) — routes live directly under /api (no /observability prefix); dev is build&&start (no watch), restart workflow after route edits.
+- [drizzle-kit push prompt](drizzle-kit-push.md) — adding unique/not-null to a populated table prompts to truncate; fails non-TTY (push-force won't help). TRUNCATE first.
