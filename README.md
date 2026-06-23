@@ -18,6 +18,29 @@ Each employee is granted an access tier, each model belongs to a tier, and the
 **Access Tiers** page rolls spend up by tier so the CFO can see exactly where
 the budget goes.
 
+## Data observability (Datadog)
+
+AgentOps layers live agent/LLM telemetry on top of the finance views by pulling
+traces directly from
+[Datadog Agent (LLM) Observability](https://docs.datadoghq.com/llm_observability/).
+The API server queries Datadog's LLM Observability **Export API**
+(`POST /api/v2/llm-obs/v1/spans/events/search`) for agent and model spans —
+latency, token usage, model, input/output, and errors — so execution traces sit
+alongside the cost data without being copied into the local database.
+
+- **Server-side only** — Datadog credentials live on the API server; the browser
+  never sees them.
+- **Read-only** — AgentOps pulls *from* Datadog and never instruments or ships
+  telemetry back to it.
+
+### Configuration
+
+| Variable | Kind | Purpose |
+| --- | --- | --- |
+| `DATADOG_SITE` | env var | Datadog site host, e.g. `us5.datadoghq.com` |
+| `DATADOG_API_KEY` | secret | Datadog API key |
+| `DATADOG_APP_KEY` | secret | Datadog application key (LLM Observability read scope) |
+
 ## Screenshots
 
 ### Organization Overview
@@ -55,4 +78,9 @@ the budget goes.
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API client + Zod schemas
 - `pnpm run typecheck` — full typecheck across all packages
 
-Required env: `DATABASE_URL` — Postgres connection string.
+Required env:
+
+- `DATABASE_URL` — Postgres connection string.
+- `DATADOG_SITE`, `DATADOG_API_KEY`, `DATADOG_APP_KEY` — Datadog Agent (LLM)
+  Observability access for the live trace data (see **Data observability**
+  above).
