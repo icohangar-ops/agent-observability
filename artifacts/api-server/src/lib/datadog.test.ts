@@ -111,6 +111,57 @@ test("normalizes a successful payload into flat spans", async () => {
   assert.deepEqual(span.tags, ["env:prod", "team:ai"]);
 });
 
+test("flattens llm messages while preserving role labels", async () => {
+  stubFetch(() =>
+    jsonResponse({
+      data: [
+        {
+          id: "event-io",
+          attributes: {
+            span_kind: "llm",
+            meta: {
+              input: {
+                messages: [
+                  { role: "system", content: "You are helpful." },
+                  { role: "user", content: "Hi" },
+                ],
+              },
+              output: { messages: [{ role: "assistant", content: "Hello!" }] },
+            },
+          },
+        },
+      ],
+    }),
+  );
+
+  const result = await searchSpans({ from: "now-30d", to: "now" });
+
+  const span = result.spans[0];
+  assert.equal(span.input, "system: You are helpful.\n\nuser: Hi");
+  assert.equal(span.output, "assistant: Hello!");
+});
+
+test("flattens non-llm value inputs as plain text", async () => {
+  stubFetch(() =>
+    jsonResponse({
+      data: [
+        {
+          id: "event-val",
+          attributes: {
+            span_kind: "tool",
+            meta: { input: { value: "search query" }, output: { value: "result" } },
+          },
+        },
+      ],
+    }),
+  );
+
+  const result = await searchSpans({ from: "now-30d", to: "now" });
+
+  assert.equal(result.spans[0].input, "search query");
+  assert.equal(result.spans[0].output, "result");
+});
+
 test("derives totalTokens from input+output when Datadog omits it", async () => {
   stubFetch(() =>
     jsonResponse({

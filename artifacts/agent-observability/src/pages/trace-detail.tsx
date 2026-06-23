@@ -6,6 +6,14 @@ import { formatTokens, formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,7 +22,18 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Activity, AlertTriangle, Coins, Timer, Inbox, ChevronRight } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Activity,
+  AlertTriangle,
+  Coins,
+  Timer,
+  Inbox,
+  ChevronRight,
+  Copy,
+  Check,
+  Maximize2,
+} from "lucide-react";
 
 const KIND_STYLES: Record<string, string> = {
   agent: "bg-primary/15 text-primary",
@@ -100,15 +119,102 @@ function computeDepths(spans: TraceSpan[]): Map<string, number> {
   return depths;
 }
 
-function IOBlock({ label, value }: { label: string; value: string | null | undefined }) {
+// Pretty-print JSON-looking strings so large tool payloads are readable; leave
+// plain text (and anything that doesn't parse) untouched.
+function prettyPrint(value: string): string {
+  const trimmed = value.trim();
+  const looksJson =
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"));
+  if (!looksJson) return value;
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+function CopyButton({ value, testId }: { value: string; testId: string }) {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast({ title: "Couldn't copy to clipboard", variant: "destructive" });
+    }
+  }
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+      onClick={copy}
+      data-testid={testId}
+    >
+      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      {copied ? "Copied" : "Copy"}
+    </Button>
+  );
+}
+
+function IOBlock({
+  label,
+  value,
+  spanId,
+}: {
+  label: string;
+  value: string | null | undefined;
+  spanId: string;
+}) {
+  const formatted = value ? prettyPrint(value) : null;
+  const key = `${label.toLowerCase()}-${spanId}`;
   return (
     <div className="space-y-1">
-      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </div>
+        {formatted && (
+          <div className="flex items-center gap-0.5">
+            <CopyButton value={formatted} testId={`button-copy-${key}`} />
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                  data-testid={`button-expand-${key}`}
+                >
+                  <Maximize2 className="size-3.5" />
+                  Expand
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-3">
+                    <span>{label}</span>
+                    <CopyButton value={formatted} testId={`button-copy-dialog-${key}`} />
+                  </DialogTitle>
+                </DialogHeader>
+                <pre
+                  className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-4 text-xs font-mono text-foreground"
+                  data-testid={`text-dialog-${key}`}
+                >
+                  {formatted}
+                </pre>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
       </div>
-      {value ? (
-        <pre className="whitespace-pre-wrap break-words rounded-md bg-muted/50 p-3 text-xs font-mono text-foreground">
-          {value}
+      {formatted ? (
+        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-3 text-xs font-mono text-foreground">
+          {formatted}
         </pre>
       ) : (
         <div className="text-xs text-muted-foreground italic">No {label.toLowerCase()} recorded</div>
@@ -306,8 +412,8 @@ export default function TraceDetail() {
                             )}
                           </div>
                           <div className="grid gap-3 md:grid-cols-2">
-                            <IOBlock label="Input" value={span.input} />
-                            <IOBlock label="Output" value={span.output} />
+                            <IOBlock label="Input" value={span.input} spanId={span.spanId} />
+                            <IOBlock label="Output" value={span.output} spanId={span.spanId} />
                           </div>
                         </div>
                       )}

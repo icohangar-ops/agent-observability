@@ -98,14 +98,24 @@ function flattenIO(v: unknown): string | null {
     const parts = obj.messages
       .map((m) => {
         if (m && typeof m === "object") {
-          const content = (m as Record<string, unknown>).content;
-          if (typeof content === "string") return content;
-          return content != null ? JSON.stringify(content) : "";
+          const msg = m as Record<string, unknown>;
+          const role = typeof msg.role === "string" && msg.role !== "" ? msg.role : null;
+          const content = msg.content;
+          const text =
+            typeof content === "string"
+              ? content
+              : content != null
+                ? JSON.stringify(content)
+                : "";
+          if (text === "") return "";
+          // Preserve the role label (e.g. "system:", "user:") so the flattened
+          // text stays legible when several messages are joined together.
+          return role ? `${role}: ${text}` : text;
         }
         return typeof m === "string" ? m : JSON.stringify(m);
       })
       .filter((s) => typeof s === "string" && s !== "");
-    return parts.length > 0 ? parts.join("\n") : null;
+    return parts.length > 0 ? parts.join("\n\n") : null;
   }
   try {
     return JSON.stringify(v);
