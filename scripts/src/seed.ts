@@ -340,8 +340,8 @@ async function main() {
       );
       for (let r = 0; r < runsToday; r++) {
         const ts = new Date(dayStart + Math.floor(rand() * DAY));
-        const inputTokens = randInt(400, 12000);
-        const outputTokens = randInt(150, 6000);
+        const inputTokens = randInt(400, 12000) * 10;
+        const outputTokens = randInt(150, 6000) * 10;
         usageEvents.push({
           agentId: agent.id,
           timestamp: ts,
