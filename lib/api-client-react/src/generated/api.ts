@@ -29,6 +29,9 @@ import type {
   EmployeeDetail,
   EmployeeSummary,
   Error,
+  GetAgentParams,
+  GetDepartmentParams,
+  GetEmployeeParams,
   GetOverviewParams,
   GetTrendsParams,
   HealthStatus,
@@ -387,21 +390,30 @@ export function useListDepartments<TData = Awaited<ReturnType<typeof listDepartm
 
 
 
-export const getGetDepartmentUrl = (departmentId: string,) => {
+export const getGetDepartmentUrl = (departmentId: string,
+    params?: GetDepartmentParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/departments/${departmentId}`
+  return stringifiedParams.length > 0 ? `/api/departments/${departmentId}?${stringifiedParams}` : `/api/departments/${departmentId}`
 }
 
 /**
  * A single department with its employees and usage aggregates.
  * @summary Department detail
  */
-export const getDepartment = async (departmentId: string, options?: RequestInit): Promise<DepartmentDetail> => {
+export const getDepartment = async (departmentId: string,
+    params?: GetDepartmentParams, options?: RequestInit): Promise<DepartmentDetail> => {
 
-  return customFetch<DepartmentDetail>(getGetDepartmentUrl(departmentId),
+  return customFetch<DepartmentDetail>(getGetDepartmentUrl(departmentId,params),
   {
     ...options,
     method: 'GET'
@@ -414,23 +426,25 @@ export const getDepartment = async (departmentId: string, options?: RequestInit)
 
 
 
-export const getGetDepartmentQueryKey = (departmentId: string,) => {
+export const getGetDepartmentQueryKey = (departmentId: string,
+    params?: GetDepartmentParams,) => {
     return [
-    `/api/departments/${departmentId}`
+    `/api/departments/${departmentId}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDepartmentQueryOptions = <TData = Awaited<ReturnType<typeof getDepartment>>, TError = ErrorType<Error>>(departmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepartment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDepartmentQueryOptions = <TData = Awaited<ReturnType<typeof getDepartment>>, TError = ErrorType<Error>>(departmentId: string,
+    params?: GetDepartmentParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepartment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDepartmentQueryKey(departmentId);
+  const queryKey =  queryOptions?.queryKey ?? getGetDepartmentQueryKey(departmentId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDepartment>>> = ({ signal }) => getDepartment(departmentId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDepartment>>> = ({ signal }) => getDepartment(departmentId,params, { signal, ...requestOptions });
 
 
 
@@ -448,11 +462,12 @@ export type GetDepartmentQueryError = ErrorType<Error>
  */
 
 export function useGetDepartment<TData = Awaited<ReturnType<typeof getDepartment>>, TError = ErrorType<Error>>(
- departmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepartment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ departmentId: string,
+    params?: GetDepartmentParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDepartment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDepartmentQueryOptions(departmentId,options)
+  const queryOptions = getGetDepartmentQueryOptions(departmentId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -550,21 +565,30 @@ export function useListEmployees<TData = Awaited<ReturnType<typeof listEmployees
 
 
 
-export const getGetEmployeeUrl = (employeeId: string,) => {
+export const getGetEmployeeUrl = (employeeId: string,
+    params?: GetEmployeeParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/employees/${employeeId}`
+  return stringifiedParams.length > 0 ? `/api/employees/${employeeId}?${stringifiedParams}` : `/api/employees/${employeeId}`
 }
 
 /**
  * A single employee with the agents they launched and usage aggregates.
  * @summary Employee detail
  */
-export const getEmployee = async (employeeId: string, options?: RequestInit): Promise<EmployeeDetail> => {
+export const getEmployee = async (employeeId: string,
+    params?: GetEmployeeParams, options?: RequestInit): Promise<EmployeeDetail> => {
 
-  return customFetch<EmployeeDetail>(getGetEmployeeUrl(employeeId),
+  return customFetch<EmployeeDetail>(getGetEmployeeUrl(employeeId,params),
   {
     ...options,
     method: 'GET'
@@ -577,23 +601,25 @@ export const getEmployee = async (employeeId: string, options?: RequestInit): Pr
 
 
 
-export const getGetEmployeeQueryKey = (employeeId: string,) => {
+export const getGetEmployeeQueryKey = (employeeId: string,
+    params?: GetEmployeeParams,) => {
     return [
-    `/api/employees/${employeeId}`
+    `/api/employees/${employeeId}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetEmployeeQueryOptions = <TData = Awaited<ReturnType<typeof getEmployee>>, TError = ErrorType<Error>>(employeeId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetEmployeeQueryOptions = <TData = Awaited<ReturnType<typeof getEmployee>>, TError = ErrorType<Error>>(employeeId: string,
+    params?: GetEmployeeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetEmployeeQueryKey(employeeId);
+  const queryKey =  queryOptions?.queryKey ?? getGetEmployeeQueryKey(employeeId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmployee>>> = ({ signal }) => getEmployee(employeeId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmployee>>> = ({ signal }) => getEmployee(employeeId,params, { signal, ...requestOptions });
 
 
 
@@ -611,11 +637,12 @@ export type GetEmployeeQueryError = ErrorType<Error>
  */
 
 export function useGetEmployee<TData = Awaited<ReturnType<typeof getEmployee>>, TError = ErrorType<Error>>(
- employeeId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ employeeId: string,
+    params?: GetEmployeeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetEmployeeQueryOptions(employeeId,options)
+  const queryOptions = getGetEmployeeQueryOptions(employeeId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -798,21 +825,30 @@ export function useListAgents<TData = Awaited<ReturnType<typeof listAgents>>, TE
 
 
 
-export const getGetAgentUrl = (agentId: string,) => {
+export const getGetAgentUrl = (agentId: string,
+    params?: GetAgentParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/agents/${agentId}`
+  return stringifiedParams.length > 0 ? `/api/agents/${agentId}?${stringifiedParams}` : `/api/agents/${agentId}`
 }
 
 /**
  * A single agent with attribution, usage aggregates, and recent activity.
  * @summary Agent detail
  */
-export const getAgent = async (agentId: string, options?: RequestInit): Promise<AgentDetail> => {
+export const getAgent = async (agentId: string,
+    params?: GetAgentParams, options?: RequestInit): Promise<AgentDetail> => {
 
-  return customFetch<AgentDetail>(getGetAgentUrl(agentId),
+  return customFetch<AgentDetail>(getGetAgentUrl(agentId,params),
   {
     ...options,
     method: 'GET'
@@ -825,23 +861,25 @@ export const getAgent = async (agentId: string, options?: RequestInit): Promise<
 
 
 
-export const getGetAgentQueryKey = (agentId: string,) => {
+export const getGetAgentQueryKey = (agentId: string,
+    params?: GetAgentParams,) => {
     return [
-    `/api/agents/${agentId}`
+    `/api/agents/${agentId}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetAgentQueryOptions = <TData = Awaited<ReturnType<typeof getAgent>>, TError = ErrorType<Error>>(agentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAgentQueryOptions = <TData = Awaited<ReturnType<typeof getAgent>>, TError = ErrorType<Error>>(agentId: string,
+    params?: GetAgentParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAgentQueryKey(agentId);
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentQueryKey(agentId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgent>>> = ({ signal }) => getAgent(agentId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgent>>> = ({ signal }) => getAgent(agentId,params, { signal, ...requestOptions });
 
 
 
@@ -859,11 +897,12 @@ export type GetAgentQueryError = ErrorType<Error>
  */
 
 export function useGetAgent<TData = Awaited<ReturnType<typeof getAgent>>, TError = ErrorType<Error>>(
- agentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ agentId: string,
+    params?: GetAgentParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAgent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetAgentQueryOptions(agentId,options)
+  const queryOptions = getGetAgentQueryOptions(agentId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

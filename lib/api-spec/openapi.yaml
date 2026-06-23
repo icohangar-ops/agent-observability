@@ -100,6 +100,8 @@ paths:
           required: true
           schema:
             type: string
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
       responses:
         "200":
           description: Department detail
@@ -143,6 +145,8 @@ paths:
           required: true
           schema:
             type: string
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
       responses:
         "200":
           description: Employee detail
@@ -204,6 +208,8 @@ paths:
           required: true
           schema:
             type: string
+        - $ref: "#/components/parameters/FromDate"
+        - $ref: "#/components/parameters/ToDate"
       responses:
         "200":
           description: Agent detail

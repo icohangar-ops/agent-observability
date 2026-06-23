@@ -1,4 +1,5 @@
 import { useGetDepartment } from "@workspace/api-client-react";
+import { useDateRange } from "@/lib/date-range";
 import { formatUSD, formatTokens, formatNumber, formatPercent } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,8 +10,9 @@ import { Link, useParams } from "wouter";
 
 export default function DepartmentDetail() {
   const { departmentId } = useParams<{ departmentId: string }>();
-  const { data: dept, isLoading } = useGetDepartment(departmentId || "", {
-    query: { enabled: !!departmentId, queryKey: ["department", departmentId] }
+  const { params } = useDateRange();
+  const { data: dept, isLoading } = useGetDepartment(departmentId || "", params, {
+    query: { enabled: !!departmentId, queryKey: ["department", departmentId, params] }
   });
 
   if (isLoading) {

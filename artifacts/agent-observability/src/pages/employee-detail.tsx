@@ -1,4 +1,5 @@
 import { useGetEmployee } from "@workspace/api-client-react";
+import { useDateRange } from "@/lib/date-range";
 import { formatUSD, formatTokens, formatNumber } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,8 +11,9 @@ import { TierBadge } from "@/components/tier-badge";
 
 export default function EmployeeDetail() {
   const { employeeId } = useParams<{ employeeId: string }>();
-  const { data: emp, isLoading } = useGetEmployee(employeeId || "", {
-    query: { enabled: !!employeeId, queryKey: ["employee", employeeId] }
+  const { params } = useDateRange();
+  const { data: emp, isLoading } = useGetEmployee(employeeId || "", params, {
+    query: { enabled: !!employeeId, queryKey: ["employee", employeeId, params] }
   });
 
   if (isLoading) {

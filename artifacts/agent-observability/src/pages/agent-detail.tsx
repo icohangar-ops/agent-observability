@@ -1,4 +1,5 @@
 import { useGetAgent } from "@workspace/api-client-react";
+import { useDateRange } from "@/lib/date-range";
 import { formatUSD, formatTokens, formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,8 +21,9 @@ import { format } from "date-fns";
 
 export default function AgentDetail() {
   const { agentId } = useParams<{ agentId: string }>();
-  const { data: agent, isLoading } = useGetAgent(agentId || "", {
-    query: { enabled: !!agentId, queryKey: ["agent", agentId] }
+  const { params } = useDateRange();
+  const { data: agent, isLoading } = useGetAgent(agentId || "", params, {
+    query: { enabled: !!agentId, queryKey: ["agent", agentId, params] }
   });
 
   if (isLoading) {

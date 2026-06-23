@@ -100,6 +100,11 @@ export const GetDepartmentParams = zod.object({
   "departmentId": zod.coerce.string()
 })
 
+export const GetDepartmentQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.')
+})
+
 export const GetDepartmentResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -188,6 +193,11 @@ export const ListEmployeesResponse = zod.array(ListEmployeesResponseItem)
  */
 export const GetEmployeeParams = zod.object({
   "employeeId": zod.coerce.string()
+})
+
+export const GetEmployeeQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.')
 })
 
 export const GetEmployeeResponse = zod.object({
@@ -301,6 +311,11 @@ export const ListAgentsResponse = zod.array(ListAgentsResponseItem)
  */
 export const GetAgentParams = zod.object({
   "agentId": zod.coerce.string()
+})
+
+export const GetAgentQueryParams = zod.object({
+  "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
+  "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.')
 })
 
 export const GetAgentResponse = zod.object({

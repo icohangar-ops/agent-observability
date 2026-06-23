@@ -294,8 +294,12 @@ async function employeeSummaries(whereDept?: string, range?: DateRange) {
   }));
 }
 
-async function modelBreakdown(opts: { departmentId?: string; employeeId?: string }) {
-  const params: string[] = [];
+async function modelBreakdown(opts: {
+  departmentId?: string;
+  employeeId?: string;
+  range?: DateRange;
+}) {
+  const params: unknown[] = [];
   const conds: string[] = [];
   if (opts.departmentId) {
     params.push(opts.departmentId);
@@ -304,6 +308,9 @@ async function modelBreakdown(opts: { departmentId?: string; employeeId?: string
   if (opts.employeeId) {
     params.push(opts.employeeId);
     conds.push(`a.employee_id = $${params.length}`);
+  }
+  if (opts.range) {
+    conds.push(...rangeConds("u", opts.range, params));
   }
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   const q = await pool.query(
@@ -333,6 +340,7 @@ async function modelBreakdown(opts: { departmentId?: string; employeeId?: string
 
 router.get("/departments/:departmentId", async (req, res) => {
   const { departmentId } = req.params;
+  const range = parseRange(req.query);
   const deptQ = await pool.query(`SELECT id, name FROM departments WHERE id = $1`, [
     departmentId,
   ]);
@@ -340,8 +348,8 @@ router.get("/departments/:departmentId", async (req, res) => {
     res.status(404).json({ error: "Department not found" });
     return;
   }
-  const employees = await employeeSummaries(departmentId);
-  const models = await modelBreakdown({ departmentId });
+  const employees = await employeeSummaries(departmentId, range);
+  const models = await modelBreakdown({ departmentId, range });
 
   const cost = employees.reduce((s, e) => s + e.cost, 0);
   const tokens = employees.reduce((s, e) => s + e.tokens, 0);
@@ -350,12 +358,18 @@ router.get("/departments/:departmentId", async (req, res) => {
   const agentCount = employees.reduce((s, e) => s + e.agentCount, 0);
   const runCount = employees.reduce((s, e) => s + e.runCount, 0);
 
-  const totalQ = await pool.query(`
+  const totalParams: unknown[] = [];
+  const totalWhere = rangeConds("u", range, totalParams);
+  const totalQ = await pool.query(
+    `
     SELECT COALESCE(SUM(${COST_SQL}), 0) AS total
     FROM usage_events u
     JOIN agents a ON a.id = u.agent_id
     JOIN models m ON m.id = a.model_id
-  `);
+    ${totalWhere.length ? `WHERE ${totalWhere.join(" AND ")}` : ""}
+  `,
+    totalParams,
+  );
   const total = num(totalQ.rows[0].total);
 
   const allBudgets = await budgetRows(departmentId);
@@ -473,6 +487,7 @@ async function agentRows(opts: {
 
 router.get("/employees/:employeeId", async (req, res) => {
   const { employeeId } = req.params;
+  const range = parseRange(req.query);
   const empQ = await pool.query(
     `SELECT e.id, e.name, e.role, e.access_tier, d.id AS department_id, d.name AS department_name
      FROM employees e JOIN departments d ON d.id = e.department_id WHERE e.id = $1`,
@@ -482,8 +497,8 @@ router.get("/employees/:employeeId", async (req, res) => {
     res.status(404).json({ error: "Employee not found" });
     return;
   }
-  const agents = await agentRows({ employeeId });
-  const models = await modelBreakdown({ employeeId });
+  const agents = await agentRows({ employeeId, range });
+  const models = await modelBreakdown({ employeeId, range });
 
   const cost = agents.reduce((s, a) => s + a.cost, 0);
   const tokens = agents.reduce((s, a) => s + a.tokens, 0);
@@ -666,13 +681,16 @@ router.get("/agents", async (req, res) => {
 
 router.get("/agents/:agentId", async (req, res) => {
   const { agentId } = req.params;
-  const rows = await agentRows({ agentId });
+  const range = parseRange(req.query);
+  const rows = await agentRows({ agentId, range });
   if (rows.length === 0) {
     res.status(404).json({ error: "Agent not found" });
     return;
   }
   const agent = rows[0];
 
+  const trendsParams: unknown[] = [agentId];
+  const trendsConds = ["u.agent_id = $1", ...rangeConds("u", range, trendsParams)];
   const trendsQ = await pool.query(
     `
     SELECT to_char(date_trunc('day', u.timestamp), 'YYYY-MM-DD') AS date,
@@ -681,12 +699,14 @@ router.get("/agents/:agentId", async (req, res) => {
     FROM usage_events u
     JOIN agents a ON a.id = u.agent_id
     JOIN models m ON m.id = a.model_id
-    WHERE u.agent_id = $1
+    WHERE ${trendsConds.join(" AND ")}
     GROUP BY 1 ORDER BY 1 ASC
   `,
-    [agentId],
+    trendsParams,
   );
 
+  const runsParams: unknown[] = [agentId];
+  const runsConds = ["u.agent_id = $1", ...rangeConds("u", range, runsParams)];
   const runsQ = await pool.query(
     `
     SELECT u.id,
@@ -697,11 +717,11 @@ router.get("/agents/:agentId", async (req, res) => {
     FROM usage_events u
     JOIN agents a ON a.id = u.agent_id
     JOIN models m ON m.id = a.model_id
-    WHERE u.agent_id = $1
+    WHERE ${runsConds.join(" AND ")}
     ORDER BY u.timestamp DESC
     LIMIT 25
   `,
-    [agentId],
+    runsParams,
   );
 
   res.json({

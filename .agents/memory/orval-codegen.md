@@ -48,3 +48,20 @@ off. Workaround: temporarily set `clean: false` in `orval.config.ts`, manually
 **Env quirk:** long-running commands (orval, `tsc --noEmit`, `typecheck:libs`)
 get killed by the bash tool wrapper on return (exit -1/124). Verify code via the
 running web/API workflows + curl/screenshots instead of relying on standalone tsc.
+
+## api-zod barrel name collision when an endpoint gets BOTH path + query params
+
+- Adding query params (e.g. `from`/`to`) to an endpoint that already has a path
+  param makes orval's zod generator emit a `<Op>Params` VALUE (the path-param
+  schema) in `lib/api-zod/src/generated/api.ts` AND a same-named TS TYPE (the
+  query-param shape) in `lib/api-zod/src/generated/types/`. The hand-written
+  barrel `lib/api-zod/src/index.ts` re-exports both folders with `export *`, so
+  `typecheck:libs` then fails with TS2308 "already exported a member named
+  `<Op>Params`".
+- **Fix:** in `lib/api-zod/src/index.ts`, after the two `export *` lines, add an
+  explicit `export { <Op>Params, ... } from "./generated/api";` for each colliding
+  op to disambiguate (the zod schema value wins; the redundant query-param type is
+  shadowed). The barrel is hand-maintained, not generated, so this survives regen.
+- **Why:** query-only endpoints don't collide because their zod schema is named
+  `<Op>QueryParams` while the type is `<Op>Params`. Only the path+query combo
+  produces two symbols sharing the exact name `<Op>Params`.

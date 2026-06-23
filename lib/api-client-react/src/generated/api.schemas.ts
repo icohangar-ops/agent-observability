@@ -297,7 +297,29 @@ from?: FromDateParameter;
 to?: ToDateParameter;
 };
 
+export type GetDepartmentParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+};
+
 export type ListEmployeesParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+};
+
+export type GetEmployeeParams = {
 /**
  * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
  */
@@ -339,4 +361,15 @@ export interface BudgetInput {
   /** Monthly budget cap in USD (must be greater than 0) */
   amount: number;
 }
+
+export type GetAgentParams = {
+/**
+ * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
+ */
+from?: FromDateParameter;
+/**
+ * Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.
+ */
+to?: ToDateParameter;
+};
 
