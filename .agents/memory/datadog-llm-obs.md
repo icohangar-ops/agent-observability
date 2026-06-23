@@ -22,6 +22,10 @@ Headers: `DD-API-KEY` + `DD-APPLICATION-KEY`.
   The span fields live directly on `attributes`: `span_kind` (the kind), `name`,
   `duration` (ns), `start_ns`, `status`, `model_name`, `model_provider`,
   `ml_app`, `tags` (string[]), and `metrics.{input_tokens,output_tokens,total_tokens}`.
+- `metrics.estimated_total_cost` (also input/output cost breakdowns) is reported
+  in **micro-dollars** — divide by 1_000_000 for USD. This is Datadog's own
+  estimate and is independent of the per-model pricing the rest of the app uses,
+  so surface it labeled as a "Datadog estimate".
 
 ## Ingestion API (write — sample data only)
 `POST https://api.<DATADOG_SITE>/api/intake/llm-obs/v1/trace/spans`

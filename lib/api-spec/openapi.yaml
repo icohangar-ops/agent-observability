@@ -1024,6 +1024,7 @@ components:
         - inputTokens
         - outputTokens
         - totalTokens
+        - estimatedCostUsd
         - latencyMs
         - status
         - timestamp
@@ -1051,6 +1052,12 @@ components:
           type: integer
         totalTokens:
           type: integer
+        estimatedCostUsd:
+          type: number
+          description: >-
+            Datadog-estimated total cost for the span in USD (converted from
+            Datadog's micro-dollar units). Independent of the per-model pricing
+            used elsewhere in the app.
         latencyMs:
           type: number
           description: Span duration in milliseconds
@@ -1089,6 +1096,7 @@ components:
         - inputTokens
         - outputTokens
         - totalTokens
+        - estimatedCostUsd
         - avgLatencyMs
       properties:
         noData:
@@ -1104,6 +1112,11 @@ components:
           type: integer
         totalTokens:
           type: integer
+        estimatedCostUsd:
+          type: number
+          description: >-
+            Total Datadog-estimated cost in USD across matching spans.
+            Independent of the per-model pricing used elsewhere in the app.
         avgLatencyMs:
           type: number
           description: Mean span latency in milliseconds across matching spans

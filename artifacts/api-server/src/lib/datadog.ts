@@ -23,6 +23,8 @@ export interface NormalizedSpan {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  /** Datadog-estimated total cost for the span, in USD. */
+  estimatedCostUsd: number;
   latencyMs: number;
   status: string;
   timestamp: string;
@@ -88,6 +90,8 @@ function normalizeSpan(id: string, attrs: Record<string, unknown>): NormalizedSp
   const inputTokens = num(metrics.input_tokens);
   const outputTokens = num(metrics.output_tokens);
   const totalTokens = metrics.total_tokens != null ? num(metrics.total_tokens) : inputTokens + outputTokens;
+  // Datadog reports estimated cost in micro-dollars; convert to USD.
+  const estimatedCostUsd = num(metrics.estimated_total_cost) / 1_000_000;
   const rawTags = Array.isArray(attrs.tags) ? (attrs.tags as unknown[]) : [];
   return {
     spanId: str(attrs.span_id) ?? id,
@@ -100,6 +104,7 @@ function normalizeSpan(id: string, attrs: Record<string, unknown>): NormalizedSp
     inputTokens,
     outputTokens,
     totalTokens,
+    estimatedCostUsd,
     latencyMs: durationNs / 1_000_000,
     status: str(attrs.status) ?? "ok",
     timestamp: startNs > 0 ? new Date(startNs / 1_000_000).toISOString() : new Date(0).toISOString(),

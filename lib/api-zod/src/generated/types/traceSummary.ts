@@ -14,6 +14,8 @@ export interface TraceSummary {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  /** Total Datadog-estimated cost in USD across matching spans. Independent of the per-model pricing used elsewhere in the app. */
+  estimatedCostUsd: number;
   /** Mean span latency in milliseconds across matching spans */
   avgLatencyMs: number;
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useListTraces, useGetTraceSummary, type TraceSpan } from "@workspace/api-client-react";
 import { useDateRange } from "@/lib/date-range";
-import { formatTokens, formatNumber } from "@/lib/format";
+import { formatTokens, formatNumber, formatUSD } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Activity, AlertTriangle, Coins, Timer, Inbox } from "lucide-react";
+import { Search, Activity, AlertTriangle, Coins, Timer, Inbox, DollarSign } from "lucide-react";
 
 const ALL_KINDS = "__all__";
 
@@ -59,6 +59,18 @@ function formatLatency(ms: number): string {
   return `${Math.round(ms)}ms`;
 }
 
+// Per-span costs are often a tiny fraction of a cent, so show enough precision
+// for small values; fall back to standard 2-decimal USD once it is >= $0.01.
+function formatCost(usd: number): string {
+  if (usd > 0 && usd < 0.01) {
+    return `$${usd.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    })}`;
+  }
+  return formatUSD(usd);
+}
+
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
@@ -75,11 +87,13 @@ function SummaryCard({
   value,
   icon: Icon,
   accent,
+  hint,
 }: {
   label: string;
   value: string;
   icon: typeof Activity;
   accent?: string;
+  hint?: string;
 }) {
   return (
     <Card className="shadow-none">
@@ -92,6 +106,7 @@ function SummaryCard({
             {label}
           </div>
           <div className="text-xl font-medium font-mono">{value}</div>
+          {hint && <div className="text-[10px] text-muted-foreground">{hint}</div>}
         </div>
       </CardContent>
     </Card>
@@ -124,9 +139,9 @@ export default function Traces() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {isSummaryLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[74px] w-full" />)
+          Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-[74px] w-full" />)
         ) : (
           <>
             <SummaryCard
@@ -150,6 +165,13 @@ export default function Traces() {
               value={formatTokens(summary?.totalTokens ?? 0)}
               icon={Coins}
               accent="bg-emerald-500/15 text-emerald-500"
+            />
+            <SummaryCard
+              label="Est. Cost"
+              value={formatCost(summary?.estimatedCostUsd ?? 0)}
+              icon={DollarSign}
+              accent="bg-green-600/15 text-green-600"
+              hint="Datadog estimate"
             />
             <SummaryCard
               label="Avg Latency"
@@ -223,6 +245,7 @@ export default function Traces() {
                   <TableHead>Kind</TableHead>
                   <TableHead>Model</TableHead>
                   <TableHead className="text-right">Tokens (in / out)</TableHead>
+                  <TableHead className="text-right">Est. Cost</TableHead>
                   <TableHead className="text-right">Latency</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -261,6 +284,13 @@ export default function Traces() {
                           <span className="text-muted-foreground">/</span>{" "}
                           {formatTokens(span.outputTokens)}
                         </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {span.estimatedCostUsd > 0 ? (
+                        formatCost(span.estimatedCostUsd)
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}

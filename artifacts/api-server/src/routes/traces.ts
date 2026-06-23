@@ -60,12 +60,14 @@ function summarize(spans: NormalizedSpan[]) {
   let inputTokens = 0;
   let outputTokens = 0;
   let totalTokens = 0;
+  let estimatedCostUsd = 0;
   let totalLatencyMs = 0;
   for (const s of spans) {
     if (s.status === "error") errorCount++;
     inputTokens += s.inputTokens;
     outputTokens += s.outputTokens;
     totalTokens += s.totalTokens;
+    estimatedCostUsd += s.estimatedCostUsd;
     totalLatencyMs += s.latencyMs;
   }
   const spanCount = spans.length;
@@ -75,6 +77,7 @@ function summarize(spans: NormalizedSpan[]) {
     inputTokens,
     outputTokens,
     totalTokens,
+    estimatedCostUsd,
     avgLatencyMs: spanCount > 0 ? totalLatencyMs / spanCount : 0,
   };
 }

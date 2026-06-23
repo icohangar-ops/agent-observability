@@ -21,6 +21,8 @@ export interface TraceSpan {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  /** Datadog-estimated total cost for the span in USD (converted from Datadog's micro-dollar units). Independent of the per-model pricing used elsewhere in the app. */
+  estimatedCostUsd: number;
   /** Span duration in milliseconds */
   latencyMs: number;
   /** ok or error */

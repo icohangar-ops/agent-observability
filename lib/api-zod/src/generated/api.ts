@@ -458,6 +458,7 @@ export const ListTracesResponse = zod.object({
   "inputTokens": zod.number(),
   "outputTokens": zod.number(),
   "totalTokens": zod.number(),
+  "estimatedCostUsd": zod.number().describe('Datadog-estimated total cost for the span in USD (converted from Datadog\'s micro-dollar units). Independent of the per-model pricing used elsewhere in the app.'),
   "latencyMs": zod.number().describe('Span duration in milliseconds'),
   "status": zod.string().describe('ok or error'),
   "timestamp": zod.string().describe('Span start time as an ISO 8601 timestamp'),
@@ -485,6 +486,7 @@ export const GetTraceSummaryResponse = zod.object({
   "inputTokens": zod.number(),
   "outputTokens": zod.number(),
   "totalTokens": zod.number(),
+  "estimatedCostUsd": zod.number().describe('Total Datadog-estimated cost in USD across matching spans. Independent of the per-model pricing used elsewhere in the app.'),
   "avgLatencyMs": zod.number().describe('Mean span latency in milliseconds across matching spans')
 })
 
