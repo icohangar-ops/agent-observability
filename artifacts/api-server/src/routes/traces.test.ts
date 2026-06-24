@@ -761,6 +761,158 @@ describe("traces routes", () => {
     assert.deepEqual(body.byApp, []);
   });
 
+  // --- Group filtering (clicking a breakdown row) ----------------------------
+  // The list and summary endpoints accept ?model=, ?app= and ?department= that
+  // narrow spans to a single breakdown group using the exact sentinel keys the
+  // breakdown emits, so a clicked card row maps 1:1 to the spans behind it.
+
+  // A span with neither a model nor an ml_app, exercising the "(no model)" /
+  // "(no app)" sentinel keys; plus a normal span to prove the filter excludes it.
+  const SENTINEL_SPANS = [
+    {
+      span_id: "n1",
+      name: "bare step",
+      span_kind: "agent",
+      model_name: null,
+      model_provider: null,
+      status: "ok",
+      ml_app: null,
+      duration: 1_000_000,
+      metrics: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+    },
+    {
+      span_id: "n2",
+      name: "gpt call",
+      span_kind: "llm",
+      model_name: "gpt-4o",
+      model_provider: "openai",
+      status: "ok",
+      ml_app: "support-bot",
+      duration: 1_000_000,
+      metrics: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+    },
+  ];
+
+  // Spans carrying explicit department tags plus one with neither a tag nor a
+  // mappable ml_app, so department grouping is deterministic without the DB.
+  const DEPT_SPANS = [
+    {
+      span_id: "d1",
+      name: "gpt call",
+      span_kind: "llm",
+      model_name: "gpt-4o",
+      status: "ok",
+      ml_app: "support-bot",
+      duration: 1_000_000,
+      tags: ["department:Engineering"],
+      metrics: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+    },
+    {
+      span_id: "d2",
+      name: "billing call",
+      span_kind: "llm",
+      model_name: "gpt-4o",
+      status: "ok",
+      ml_app: "billing-agent",
+      duration: 1_000_000,
+      tags: ["team:Finance"],
+      metrics: { input_tokens: 2, output_tokens: 1, total_tokens: 3 },
+    },
+    {
+      span_id: "d3",
+      name: "orphan call",
+      span_kind: "agent",
+      model_name: "gpt-4o",
+      status: "ok",
+      ml_app: "no-such-agent",
+      duration: 1_000_000,
+      metrics: { input_tokens: 3, output_tokens: 1, total_tokens: 4 },
+    },
+  ];
+
+  test("GET /traces?model= narrows the list to a single model group", async () => {
+    const { body } = await getJson<TraceListResponse>(`${base}/traces?model=gpt-4o`);
+    assert.deepEqual(spanIds(body), ["s1"]);
+  });
+
+  test("GET /traces?model= matches the (no model) sentinel for model-less spans", async () => {
+    nextDatadog = datadogSpans(SENTINEL_SPANS);
+    const { body } = await getJson<TraceListResponse>(
+      `${base}/traces?model=${encodeURIComponent("(no model)")}`,
+    );
+    assert.deepEqual(spanIds(body), ["n1"]);
+  });
+
+  test("GET /traces?app= narrows the list to a single app group", async () => {
+    const { body } = await getJson<TraceListResponse>(`${base}/traces?app=support-bot`);
+    assert.deepEqual(spanIds(body), ["s1", "s2"]);
+  });
+
+  test("GET /traces?app= matches the (no app) sentinel for app-less spans", async () => {
+    nextDatadog = datadogSpans(SENTINEL_SPANS);
+    const { body } = await getJson<TraceListResponse>(
+      `${base}/traces?app=${encodeURIComponent("(no app)")}`,
+    );
+    assert.deepEqual(spanIds(body), ["n1"]);
+  });
+
+  test("GET /traces?department= narrows the list to a single department group", async () => {
+    nextDatadog = datadogSpans(DEPT_SPANS);
+    const { body } = await getJson<TraceListResponse>(`${base}/traces?department=Engineering`);
+    assert.deepEqual(spanIds(body), ["d1"]);
+  });
+
+  test("GET /traces?department= matches the (unattributed) sentinel", async () => {
+    nextDatadog = datadogSpans(DEPT_SPANS);
+    const { body } = await getJson<TraceListResponse>(
+      `${base}/traces?department=${encodeURIComponent("(unattributed)")}`,
+    );
+    assert.deepEqual(spanIds(body), ["d3"]);
+  });
+
+  test("GET /traces combines a group filter with kind and q", async () => {
+    // app=support-bot keeps s1 + s2; kind=llm then drops the agent span s2.
+    const { body } = await getJson<TraceListResponse>(`${base}/traces?app=support-bot&kind=llm`);
+    assert.deepEqual(spanIds(body), ["s1"]);
+  });
+
+  test("GET /traces returns no spans when the group value matches nothing", async () => {
+    const { body } = await getJson<TraceListResponse>(`${base}/traces?model=does-not-exist`);
+    assert.deepEqual(spanIds(body), []);
+  });
+
+  test("GET /traces/summary?model= aggregates only the selected model group", async () => {
+    // model=gpt-4o keeps only s1 (10 in / 5 out / 15 total, 1 ms, ok).
+    const { body } = await getJson<TraceSummaryResponse>(`${base}/traces/summary?model=gpt-4o`);
+    assert.equal(body.spanCount, 1);
+    assert.equal(body.errorCount, 0);
+    assert.equal(body.inputTokens, 10);
+    assert.equal(body.outputTokens, 5);
+    assert.equal(body.totalTokens, 15);
+    assert.equal(body.avgLatencyMs, 1);
+  });
+
+  test("GET /traces/summary?app= aggregates only the selected app group", async () => {
+    // app=support-bot keeps s1 + s2 (one of which is the error span).
+    const { body } = await getJson<TraceSummaryResponse>(`${base}/traces/summary?app=support-bot`);
+    assert.equal(body.spanCount, 2);
+    assert.equal(body.errorCount, 1);
+    assert.equal(body.inputTokens, 30);
+    assert.equal(body.outputTokens, 5);
+    assert.equal(body.totalTokens, 35);
+    // (1 + 3) ms / 2 spans = 2 ms average.
+    assert.equal(body.avgLatencyMs, 2);
+  });
+
+  test("GET /traces/summary?department= aggregates only the selected department group", async () => {
+    nextDatadog = datadogSpans(DEPT_SPANS);
+    const { body } = await getJson<TraceSummaryResponse>(
+      `${base}/traces/summary?department=Engineering`,
+    );
+    assert.equal(body.spanCount, 1);
+    assert.equal(body.totalTokens, 2);
+  });
+
   // --- Date-range forwarding for the list/summary/breakdown endpoints --------
   // These three endpoints share parseRange + datadogBounds with the detail
   // route, so they must convert the dashboard's ISO range into the same
