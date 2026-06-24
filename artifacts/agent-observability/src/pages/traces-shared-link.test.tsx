@@ -1068,6 +1068,89 @@ describe("Traces + DateRangeProvider shared link", () => {
     ).toBeNull();
   });
 
+  it("widens then re-narrows the breakdown query when clearing and re-selecting a group while staying in drill-in mode", async () => {
+    // The toggle test above proves switching *modes* widens the breakdown. This
+    // one keeps the mode fixed at drill-in and changes the *active group*: a
+    // user lands in drill-in narrowed to gpt-4o, clears it by clicking the
+    // active row again, then picks a different model. The breakdown query must
+    // widen (groupParams empty) when no group is active and re-narrow to the new
+    // group when one is picked — all without leaving drill-in. A regression
+    // could strand the breakdown on the stale group or fail to widen on clear.
+    useGetTraceCostBreakdown.mockReturnValue(
+      breakdownResult({
+        data: {
+          noData: false,
+          byModel: [group({ key: "gpt-4o" }), group({ key: "gpt-4o-mini" })],
+          byApp: [group({ key: "support-bot" })],
+          byDepartment: [group({ key: "Engineering" })],
+        },
+      }),
+    );
+
+    window.localStorage.clear();
+    window.history.replaceState(
+      {},
+      "",
+      "/traces?bmode=drillin&group=model&gval=gpt-4o",
+    );
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // Start pressed on drill-in narrowed to gpt-4o, purely from the URL.
+    const drillin = await screen.findByTestId("breakdown-mode-drillin");
+    expect(drillin).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => {
+      expect(lastBreakdownParams().model).toBe("gpt-4o");
+    });
+
+    // 1) Clear the active group by clicking its active row again. The breakdown
+    // widens — the group dimension drops — while bmode stays drillin.
+    fireEvent.click(screen.getByTestId("breakdown-row-gpt-4o"));
+    await waitFor(() => {
+      expect(lastBreakdownParams().model).toBeUndefined();
+    });
+    expect(screen.getByTestId("breakdown-mode-drillin")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    // The URL drops group/gval but keeps bmode=drillin throughout.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("bmode")).toBe("drillin");
+      expect(search.get("group")).toBeNull();
+      expect(search.get("gval")).toBeNull();
+    });
+
+    // 2) Select a different group; the breakdown re-narrows to the new group
+    // while bmode stays drillin.
+    fireEvent.click(screen.getByTestId("breakdown-row-gpt-4o-mini"));
+    await waitFor(() => {
+      expect(lastBreakdownParams().model).toBe("gpt-4o-mini");
+    });
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("bmode")).toBe("drillin");
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o-mini");
+    });
+    expect(screen.getByTestId("breakdown-mode-drillin")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    // Extra ticks prove the re-narrowed breakdown settled rather than snapping
+    // back to the stale group or widening again a tick later.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(lastBreakdownParams().model).toBe("gpt-4o-mini");
+    expect(new URLSearchParams(window.location.search).get("bmode")).toBe(
+      "drillin",
+    );
+  });
+
   it("re-applies the kind, search, and sort choices to a clean path after page-to-page navigation", async () => {
     // Mid-session on an all-time page so there is no date range to also
     // re-apply, isolating the kind/search/sort slice of the *same* URL-sync
