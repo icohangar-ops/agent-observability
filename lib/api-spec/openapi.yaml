@@ -396,13 +396,19 @@ paths:
         the trace list. Department is derived from an explicit `department:`,
         `dept:`, or `team:` span tag, falling back to mapping the span's ml_app
         to its owning agent's department. Each group list is sorted by estimated
-        cost descending. When the org has no LLM Obs data yet, `noData` is true
-        and all lists are empty (not an error).
+        cost descending. The same optional `model`/`app`/`department` group
+        filters as the trace list are honored, so a drill-in view can narrow the
+        breakdown to a single active group (e.g. which models a department used).
+        When the org has no LLM Obs data yet, `noData` is true and all lists are
+        empty (not an error).
       parameters:
         - $ref: "#/components/parameters/FromDate"
         - $ref: "#/components/parameters/ToDate"
         - $ref: "#/components/parameters/SpanKind"
         - $ref: "#/components/parameters/TraceQuery"
+        - $ref: "#/components/parameters/TraceModel"
+        - $ref: "#/components/parameters/TraceApp"
+        - $ref: "#/components/parameters/TraceDepartment"
       responses:
         "200":
           description: Cost broken down by model and by app/agent

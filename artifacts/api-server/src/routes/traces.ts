@@ -285,10 +285,14 @@ router.get("/traces/breakdown", async (req, res) => {
   const range = parseRange(req.query as Record<string, unknown>);
   const kind = singleString(req.query.kind);
   const query = singleString(req.query.q);
+  const group = parseGroupFilter(req.query as Record<string, unknown>);
   const bounds = datadogBounds(range);
 
   const { spans, noData } = await searchSpans({ from: bounds.from, to: bounds.to });
-  const filtered = applyFilters(spans, kind, query);
+  // In navigate mode the dashboard sends no group filter, so the breakdown stays
+  // scoped to date/kind/search. In drill-in mode it sends the active group, so
+  // the breakdown narrows to that subset (e.g. which models a department used).
+  const filtered = await applyGroupFilter(applyFilters(spans, kind, query), group);
   const mlAppToDept = await loadDepartmentMap();
   const canonicalDepartments = buildCanonicalDepartments(filtered, mlAppToDept);
   const byModel = groupByCost(filtered, (s) => s.model ?? "(no model)");

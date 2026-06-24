@@ -463,6 +463,60 @@ describe("traces routes", () => {
     );
   });
 
+  test("GET /traces/breakdown narrows to the active group in drill-in mode", async () => {
+    // Two departments using overlapping models; drilling into one department
+    // should leave only that department's models/apps in the breakdown.
+    nextDatadog = datadogSpans([
+      {
+        span_id: "d1",
+        name: "gpt call",
+        span_kind: "llm",
+        model_name: "gpt-4o",
+        ml_app: "support-bot",
+        duration: 1_000_000,
+        tags: ["department:Engineering"],
+        metrics: { input_tokens: 1, output_tokens: 1, total_tokens: 2, estimated_total_cost: 3_000_000 },
+      },
+      {
+        span_id: "d2",
+        name: "claude call",
+        span_kind: "llm",
+        model_name: "claude-3",
+        ml_app: "support-bot",
+        duration: 1_000_000,
+        tags: ["department:Engineering"],
+        metrics: { input_tokens: 1, output_tokens: 1, total_tokens: 2, estimated_total_cost: 1_000_000 },
+      },
+      {
+        span_id: "d3",
+        name: "gpt mini",
+        span_kind: "llm",
+        model_name: "gpt-4o",
+        ml_app: "billing-agent",
+        duration: 1_000_000,
+        tags: ["department:Finance"],
+        metrics: { input_tokens: 1, output_tokens: 1, total_tokens: 2, estimated_total_cost: 9_000_000 },
+      },
+    ]);
+
+    const { body } = await getJson<TraceBreakdownResponse>(
+      `${base}/traces/breakdown?department=Engineering`,
+    );
+    // Only Engineering's spans remain, so its models are gpt-4o ($3) and claude-3 ($1).
+    assert.deepEqual(
+      body.byModel.map((g) => [g.key, g.cost]),
+      [
+        ["gpt-4o", 3],
+        ["claude-3", 1],
+      ],
+    );
+    // The department card collapses to just the drilled-in group.
+    assert.deepEqual(
+      body.byDepartment.map((g) => g.key),
+      ["Engineering"],
+    );
+  });
+
   test("GET /traces/breakdown reports empty groups when there is no data", async () => {
     nextDatadog = noIndexError;
     const { body } = await getJson<TraceBreakdownResponse>(`${base}/traces/breakdown`);

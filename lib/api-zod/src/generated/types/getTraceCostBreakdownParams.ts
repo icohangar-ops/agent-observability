@@ -8,6 +8,9 @@
 import type { FromDateParameter } from './fromDateParameter';
 import type { SpanKindParameter } from './spanKindParameter';
 import type { ToDateParameter } from './toDateParameter';
+import type { TraceAppParameter } from './traceAppParameter';
+import type { TraceDepartmentParameter } from './traceDepartmentParameter';
+import type { TraceModelParameter } from './traceModelParameter';
 import type { TraceQueryParameter } from './traceQueryParameter';
 
 export type GetTraceCostBreakdownParams = {
@@ -27,4 +30,16 @@ kind?: SpanKindParameter;
  * Free-text filter matched against span name, model, provider, kind, and ml_app.
  */
 q?: TraceQueryParameter;
+/**
+ * Restrict to spans whose model matches this exact value, as keyed by the cost breakdown (e.g. "gpt-4o", or "(no model)" for spans without a model). Used to drill from a model breakdown row into the span table.
+ */
+model?: TraceModelParameter;
+/**
+ * Restrict to spans whose ml_app/agent matches this exact value, as keyed by the cost breakdown (e.g. an agent id, or "(no app)" for spans without one). Used to drill from an app breakdown row into the span table.
+ */
+app?: TraceAppParameter;
+/**
+ * Restrict to spans whose derived department/team matches this exact value, as keyed by the cost breakdown (e.g. "Engineering", or "(unattributed)"). Department is derived from a department/dept/team span tag, falling back to the span's ml_app owning agent's department. Used to drill from a department breakdown row into the span table.
+ */
+department?: TraceDepartmentParameter;
 };

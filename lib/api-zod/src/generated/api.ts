@@ -549,14 +549,17 @@ export const GetTraceSummaryResponse = zod.object({
 
 
 /**
- * Datadog-estimated cost grouped by model, by ml_app (agent), and by department/team, for the spans matching the same window and filters as the trace list. Department is derived from an explicit `department:`, `dept:`, or `team:` span tag, falling back to mapping the span's ml_app to its owning agent's department. Each group list is sorted by estimated cost descending. When the org has no LLM Obs data yet, `noData` is true and all lists are empty (not an error).
+ * Datadog-estimated cost grouped by model, by ml_app (agent), and by department/team, for the spans matching the same window and filters as the trace list. Department is derived from an explicit `department:`, `dept:`, or `team:` span tag, falling back to mapping the span's ml_app to its owning agent's department. Each group list is sorted by estimated cost descending. The same optional `model`/`app`/`department` group filters as the trace list are honored, so a drill-in view can narrow the breakdown to a single active group (e.g. which models a department used). When the org has no LLM Obs data yet, `noData` is true and all lists are empty (not an error).
  * @summary Estimated cost grouped by model, by app/agent, and by department
  */
 export const GetTraceCostBreakdownQueryParams = zod.object({
   "from": zod.date().optional().describe('Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.'),
   "to": zod.date().optional().describe('Inclusive end of the reporting window as an ISO date (YYYY-MM-DD). Events on this day are included. When omitted, aggregation runs to the latest usage event.'),
   "kind": zod.coerce.string().optional().describe('Restrict to a single LLM Obs span kind (e.g. llm, agent, workflow, tool, task, embedding, retrieval). When omitted, all kinds are returned.'),
-  "q": zod.coerce.string().optional().describe('Free-text filter matched against span name, model, provider, kind, and ml_app.')
+  "q": zod.coerce.string().optional().describe('Free-text filter matched against span name, model, provider, kind, and ml_app.'),
+  "model": zod.coerce.string().optional().describe('Restrict to spans whose model matches this exact value, as keyed by the cost breakdown (e.g. \"gpt-4o\", or \"(no model)\" for spans without a model). Used to drill from a model breakdown row into the span table.'),
+  "app": zod.coerce.string().optional().describe('Restrict to spans whose ml_app\/agent matches this exact value, as keyed by the cost breakdown (e.g. an agent id, or \"(no app)\" for spans without one). Used to drill from an app breakdown row into the span table.'),
+  "department": zod.coerce.string().optional().describe('Restrict to spans whose derived department\/team matches this exact value, as keyed by the cost breakdown (e.g. \"Engineering\", or \"(unattributed)\"). Department is derived from a department\/dept\/team span tag, falling back to the span\'s ml_app owning agent\'s department. Used to drill from a department breakdown row into the span table.')
 })
 
 export const GetTraceCostBreakdownResponse = zod.object({

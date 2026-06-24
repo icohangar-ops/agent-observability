@@ -1498,7 +1498,7 @@ export const getGetTraceCostBreakdownUrl = (params?: GetTraceCostBreakdownParams
 }
 
 /**
- * Datadog-estimated cost grouped by model, by ml_app (agent), and by department/team, for the spans matching the same window and filters as the trace list. Department is derived from an explicit `department:`, `dept:`, or `team:` span tag, falling back to mapping the span's ml_app to its owning agent's department. Each group list is sorted by estimated cost descending. When the org has no LLM Obs data yet, `noData` is true and all lists are empty (not an error).
+ * Datadog-estimated cost grouped by model, by ml_app (agent), and by department/team, for the spans matching the same window and filters as the trace list. Department is derived from an explicit `department:`, `dept:`, or `team:` span tag, falling back to mapping the span's ml_app to its owning agent's department. Each group list is sorted by estimated cost descending. The same optional `model`/`app`/`department` group filters as the trace list are honored, so a drill-in view can narrow the breakdown to a single active group (e.g. which models a department used). When the org has no LLM Obs data yet, `noData` is true and all lists are empty (not an error).
  * @summary Estimated cost grouped by model, by app/agent, and by department
  */
 export const getTraceCostBreakdown = async (params?: GetTraceCostBreakdownParams, options?: RequestInit): Promise<TraceCostBreakdown> => {

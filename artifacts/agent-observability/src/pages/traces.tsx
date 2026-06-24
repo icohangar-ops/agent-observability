@@ -164,12 +164,24 @@ interface GroupFilter {
   value: string;
 }
 
+// "navigate" keeps the breakdown cards scoped to date/kind/search so they stay a
+// stable navigation aid. "drillin" narrows the breakdown to the active group so
+// the other cards reflect it (e.g. clicking a department shows its models/apps).
+type BreakdownMode = "navigate" | "drillin";
+
+const BREAKDOWN_MODES: BreakdownMode[] = ["navigate", "drillin"];
+
+function isBreakdownMode(value: string | null | undefined): value is BreakdownMode {
+  return value != null && (BREAKDOWN_MODES as string[]).includes(value);
+}
+
 interface TracesView {
   kind: string;
   search: string;
   sortColumn: SortColumn | null;
   sortDirection: SortDirection;
   group: GroupFilter | null;
+  breakdownMode: BreakdownMode;
 }
 
 const VIEW_STORAGE_KEY = "agent-observability:traces-view";
@@ -207,12 +219,16 @@ function initialView(): TracesView {
       ? { dimension: groupDimRaw, value: groupValue }
       : null;
 
+  const modeRaw = url.get("bmode") ?? stored.breakdownMode ?? "navigate";
+  const breakdownMode: BreakdownMode = isBreakdownMode(modeRaw) ? modeRaw : "navigate";
+
   return {
     kind: url.get("kind") ?? stored.kind ?? ALL_KINDS,
     search: url.get("q") ?? stored.search ?? "",
     sortColumn,
     sortDirection,
     group,
+    breakdownMode,
   };
 }
 
@@ -319,6 +335,7 @@ export default function Traces() {
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(initial.sortColumn);
   const [sortDirection, setSortDirection] = useState<SortDirection>(initial.sortDirection);
   const [group, setGroup] = useState<GroupFilter | null>(initial.group);
+  const [breakdownMode, setBreakdownMode] = useState<BreakdownMode>(initial.breakdownMode);
 
   // Persist the current view so it survives <Link> navigation (which drops the
   // query string) and restores on the next visit even without a shared URL.
@@ -327,12 +344,19 @@ export default function Traces() {
     try {
       window.localStorage.setItem(
         VIEW_STORAGE_KEY,
-        JSON.stringify({ kind, search, sortColumn, sortDirection, group } satisfies TracesView),
+        JSON.stringify({
+          kind,
+          search,
+          sortColumn,
+          sortDirection,
+          group,
+          breakdownMode,
+        } satisfies TracesView),
       );
     } catch {
       // ignore storage failures (private mode, quota, etc.)
     }
-  }, [kind, search, sortColumn, sortDirection, group]);
+  }, [kind, search, sortColumn, sortDirection, group, breakdownMode]);
 
   // Reflect the view in the URL so it is shareable and survives a reload. Keys
   // are set/deleted in place to preserve ordering and avoid fighting the
@@ -360,10 +384,15 @@ export default function Traces() {
       next.delete("group");
       next.delete("gval");
     }
+    if (breakdownMode !== "navigate") {
+      next.set("bmode", breakdownMode);
+    } else {
+      next.delete("bmode");
+    }
     const desired = next.toString();
     if (current === desired) return;
     navigate(`${location}${desired ? `?${desired}` : ""}`, { replace: true });
-  }, [kind, search, sortColumn, sortDirection, group, location, navigate]);
+  }, [kind, search, sortColumn, sortDirection, group, breakdownMode, location, navigate]);
 
   // Clicking a breakdown row toggles a single-group filter on the table; clicking
   // the active row again clears it. Only one group dimension can be active at a
@@ -376,19 +405,23 @@ export default function Traces() {
     );
   }
 
-  // The breakdown is the navigation aid, so it stays scoped to the date/kind/
-  // search filters only — it must keep showing every group so a user can pivot
-  // to or clear the active group. The table and summary additionally narrow to
-  // the clicked group.
-  const breakdownParams = {
+  const groupParams = group ? { [group.dimension]: group.value } : {};
+
+  // Base scope shared by every query: date range + kind + search.
+  const baseParams = {
     ...params,
     ...(kind !== ALL_KINDS ? { kind } : {}),
     ...(search.trim() !== "" ? { q: search.trim() } : {}),
   };
-  const queryParams = {
-    ...breakdownParams,
-    ...(group ? { [group.dimension]: group.value } : {}),
-  };
+
+  // In "navigate" mode the breakdown stays scoped to date/kind/search only, so
+  // it keeps showing every group as a stable navigation aid. In "drillin" mode
+  // it additionally narrows to the active group, so the other cards reflect that
+  // group (e.g. clicking a department reveals which models/apps it used). The
+  // table and summary always narrow to the clicked group regardless of mode.
+  const breakdownParams =
+    breakdownMode === "drillin" ? { ...baseParams, ...groupParams } : baseParams;
+  const queryParams = { ...baseParams, ...groupParams };
 
   const { data: traces, isLoading: isTracesLoading } = useListTraces(queryParams);
   const { data: summary, isLoading: isSummaryLoading } = useGetTraceSummary(queryParams);
@@ -501,6 +534,41 @@ export default function Traces() {
         </div>
       ) : hasBreakdown ? (
         <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-semibold">Cost breakdown</div>
+            <div
+              className="inline-flex items-center rounded-md border p-0.5"
+              role="group"
+              aria-label="Breakdown mode"
+              data-testid="breakdown-mode-toggle"
+            >
+              {BREAKDOWN_MODES.map((mode) => {
+                const isActive = breakdownMode === mode;
+                const label = mode === "navigate" ? "Navigate" : "Drill in";
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setBreakdownMode(mode)}
+                    aria-pressed={isActive}
+                    title={
+                      mode === "navigate"
+                        ? "Keep the cards showing every group as a navigation aid"
+                        : "Narrow the cards to the selected group"
+                    }
+                    data-testid={`breakdown-mode-${mode}`}
+                    className={`rounded px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <BreakdownCard
               title="Top models by est. cost"
@@ -535,7 +603,12 @@ export default function Traces() {
           </div>
           <p className="text-[10px] text-muted-foreground">
             Costs are Datadog estimates, grouped over the active date range and filters. Click a row
-            to filter the spans below.
+            to filter the spans below.{" "}
+            {breakdownMode === "drillin"
+              ? group
+                ? "Drill-in is on, so these cards reflect the selected group."
+                : "Drill-in is on — select a row and the other cards will reflect it."
+              : "Switch to Drill in to make these cards reflect the selected group."}
           </p>
         </div>
       ) : null}
