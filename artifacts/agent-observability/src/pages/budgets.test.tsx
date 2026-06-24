@@ -80,4 +80,89 @@ describe("Budgets save toast auto-dismiss", () => {
       vi.useRealTimers();
     }
   });
+
+  it("auto-dismisses the 'Budget removed' toast after the default window when the user does nothing", () => {
+    // The delete-success toast also sets no explicit duration, so it relies on
+    // the shared default auto-dismiss. Guard the delete path the same way.
+    useListBudgets.mockReturnValue({
+      data: [
+        {
+          id: "budget-1",
+          departmentName: "Engineering",
+          modelName: null,
+          amount: 100,
+          spend: 10,
+          utilization: 0.1,
+          status: "ok",
+          period: "2026-06",
+        },
+      ],
+      isLoading: false,
+    });
+    // Invoke onSuccess synchronously so the test focuses purely on the toast's
+    // own auto-dismiss behavior.
+    useDeleteBudget.mockImplementation((options?: MutationOptions) => ({
+      mutate: () => options?.mutation?.onSuccess?.(),
+      isPending: false,
+    }));
+
+    render(
+      <>
+        <Budgets />
+        <Toaster />
+      </>,
+    );
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByTestId("button-delete-budget-budget-1"));
+      expect(screen.getByText("Budget removed")).toBeInTheDocument();
+
+      // Just before the default auto-dismiss window elapses it is still shown.
+      act(() => {
+        vi.advanceTimersByTime(4000);
+      });
+      expect(screen.getByText("Budget removed")).toBeInTheDocument();
+
+      // Once the default window passes, the toast dismisses itself.
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.queryByText("Budget removed")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("auto-dismisses the 'Pick a department' validation toast after the default window", () => {
+    // Validation toasts share the same default-duration mechanism. With no
+    // department selected, handleSave fires this warning without an explicit
+    // duration, so a regression to the default could pin it forever.
+    render(
+      <>
+        <Budgets />
+        <Toaster />
+      </>,
+    );
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByTestId("button-save-budget"));
+      expect(screen.getByText("Pick a department")).toBeInTheDocument();
+
+      // Just before the default auto-dismiss window elapses it is still shown.
+      act(() => {
+        vi.advanceTimersByTime(4000);
+      });
+      expect(screen.getByText("Pick a department")).toBeInTheDocument();
+
+      // Once the default window passes, the toast dismisses itself.
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.queryByText("Pick a department")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
