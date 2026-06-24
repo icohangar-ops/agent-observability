@@ -1130,6 +1130,56 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(settledParams.to).toBeUndefined();
   });
 
+  it("falls back to all time when localStorage.getItem throws", async () => {
+    // Safari private mode and locked-down enterprise profiles throw a
+    // SecurityError on the getItem call itself, *before* any value is returned —
+    // a distinct failure mode from the malformed-JSON / unknown-preset cases
+    // above, which fail inside JSON.parse / validation after getItem returns.
+    // The try/catch in parseStorage must swallow this read throw too, so
+    // initialState() falls back to the all-time default rather than crashing.
+    // jsdom's localStorage delegates getItem to Storage.prototype, so the spy
+    // must target the prototype (an instance spy is never hit).
+    const getItemSpy = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new DOMException("storage is disabled", "SecurityError");
+      });
+
+    try {
+      window.history.replaceState({}, "", "/traces");
+
+      render(
+        <DateRangeProvider>
+          <Traces />
+        </DateRangeProvider>,
+      );
+
+      // All-time means no date window is sent to the API, even though the read
+      // threw at mount.
+      await waitFor(() => {
+        const params = lastListParams();
+        expect(params.from).toBeUndefined();
+        expect(params.to).toBeUndefined();
+      });
+
+      // Prove the read was actually attempted (and thus actually threw).
+      expect(getItemSpy).toHaveBeenCalled();
+
+      // No range/from/to are injected into the URL for the all-time default,
+      // and the URL must stay settled rather than ping-ponging.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const settled = new URLSearchParams(window.location.search);
+      expect(settled.get("range")).toBeNull();
+      expect(settled.get("from")).toBeNull();
+      expect(settled.get("to")).toBeNull();
+      const settledParams = lastListParams();
+      expect(settledParams.from).toBeUndefined();
+      expect(settledParams.to).toBeUndefined();
+    } finally {
+      getItemSpy.mockRestore();
+    }
+  });
+
   it("still applies the date range when localStorage.setItem throws", async () => {
     // Private-mode / quota-exceeded / storage-disabled browsers throw on every
     // setItem. The provider's persist effect wraps the write in try/catch, so a
