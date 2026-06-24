@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useLocation } from "wouter";
 import { format, startOfMonth, subDays } from "date-fns";
@@ -1715,6 +1715,86 @@ describe("Traces + DateRangeProvider shared link", () => {
       expect(stored.group).toEqual({ dimension: "model", value: "gpt-4o" });
       expect(stored.breakdownMode).toBe("drillin");
     });
+  });
+
+  it("auto-dismisses the Undo toast after a few seconds when the user does not act", async () => {
+    // The shared toast infra's global remove delay is effectively infinite, so
+    // without a scoped timer the Undo toast would linger until manually closed.
+    // A single trivial filter (kind=llm) resets immediately with no confirm,
+    // surfacing the Undo toast; left untouched it must dismiss on its own.
+    vi.useFakeTimers();
+    try {
+      window.localStorage.clear();
+      window.history.replaceState({}, "", "/traces?kind=llm");
+
+      render(
+        <DateRangeProvider>
+          <Traces />
+          <Toaster />
+        </DateRangeProvider>,
+      );
+
+      // Reset immediately (single filter → no confirm) and surface the toast.
+      fireEvent.click(screen.getByTestId("button-reset-view"));
+      expect(screen.getByTestId("button-undo-reset")).toBeInTheDocument();
+
+      // Just before the auto-dismiss window elapses, the toast is still there.
+      act(() => {
+        vi.advanceTimersByTime(6000);
+      });
+      expect(screen.getByTestId("button-undo-reset")).toBeInTheDocument();
+
+      // Once the scoped timer fires, the toast dismisses itself.
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.queryByTestId("button-undo-reset")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the restored view when Undo is clicked, cancelling the auto-dismiss", async () => {
+    // Clicking Undo must restore the prior view AND cancel the scoped timer, so
+    // a later firing of that timer can never wipe what Undo just brought back.
+    vi.useFakeTimers();
+    try {
+      window.localStorage.clear();
+      window.history.replaceState({}, "", "/traces?kind=llm");
+
+      render(
+        <DateRangeProvider>
+          <Traces />
+          <Toaster />
+        </DateRangeProvider>,
+      );
+
+      fireEvent.click(screen.getByTestId("button-reset-view"));
+      const undo = screen.getByTestId("button-undo-reset");
+
+      // Undo before the auto-dismiss window: the kind filter comes back.
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      fireEvent.click(undo);
+
+      // fireEvent flushes state synchronously, so the restored kind reaches the
+      // list query immediately (no waitFor, which is unreliable under fake timers).
+      expect(lastListParams().kind).toBe("llm");
+
+      // Advancing well past the auto-dismiss window must not re-clear the view:
+      // dismissing on Undo already tore the toast (and its timer) down.
+      act(() => {
+        vi.advanceTimersByTime(20000);
+      });
+      expect(lastListParams().kind).toBe("llm");
+      const stored = JSON.parse(
+        window.localStorage.getItem(VIEW_STORAGE_KEY) ?? "{}",
+      ) as Record<string, unknown>;
+      expect(stored.kind).toBe("llm");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("re-applies the kind, search, and sort choices to a clean path after page-to-page navigation", async () => {

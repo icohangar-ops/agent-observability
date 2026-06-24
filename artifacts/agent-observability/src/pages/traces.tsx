@@ -61,6 +61,12 @@ import { useToast } from "@/hooks/use-toast";
 
 const ALL_KINDS = "__all__";
 
+// How long the post-reset Undo toast stays before auto-dismissing. Scoped to
+// this toast only (set as its own `duration`) so the global TOAST_REMOVE_DELAY
+// — which is effectively infinite — is left untouched for other toasts. A few
+// seconds longer than the toast default to give users real time to undo.
+const UNDO_TOAST_DISMISS_MS = 7000;
+
 const KIND_OPTIONS = [
   { value: "agent", label: "Agent" },
   { value: "workflow", label: "Workflow" },
@@ -527,6 +533,13 @@ export default function Traces() {
     const { dismiss } = toast({
       title: "View reset",
       description: "All filters cleared.",
+      // Scope a short auto-dismiss to just this toast so the Undo is a genuine
+      // transient affordance. We set `duration` on the toast itself rather than
+      // touching the global TOAST_REMOVE_DELAY, so trace-detail copy and budget
+      // toasts keep their own behavior. Using the toast's own duration (instead
+      // of a manual setTimeout) also means the countdown pauses while the user
+      // hovers or focuses the toast — giving them real time to click Undo.
+      duration: UNDO_TOAST_DISMISS_MS,
       action: (
         <ToastAction
           altText="Undo reset and restore the previous view"
