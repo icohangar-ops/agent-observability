@@ -454,13 +454,19 @@ export default function Traces() {
       byDepartment.some((g) => g.cost > 0));
 
   const hasActiveView =
-    kind !== ALL_KINDS || search.trim() !== "" || sortColumn !== null;
+    kind !== ALL_KINDS ||
+    search.trim() !== "" ||
+    sortColumn !== null ||
+    group !== null ||
+    breakdownMode !== "navigate";
 
   function resetView() {
     setKind(ALL_KINDS);
     setSearch("");
     setSortColumn(null);
     setSortDirection("desc");
+    setGroup(null);
+    setBreakdownMode("navigate");
     if (typeof window !== "undefined") {
       try {
         window.localStorage.removeItem(VIEW_STORAGE_KEY);

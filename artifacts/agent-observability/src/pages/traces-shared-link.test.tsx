@@ -1494,21 +1494,23 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(settled.get("gval")).toBe("gpt-4o");
   });
 
-  it("clears kind, search, and sort together when the Reset View control is used", async () => {
+  it("clears kind, search, sort, and the breakdown filter together when the Reset View control is used", async () => {
     // Tasks #101/#102/#103 each clear a *single* control (kind back to All
     // kinds, the search box). This covers the page's one-click Reset View path
-    // (resetView), which must clear kind, search, AND sort *together*. A user
-    // lands with all three active via a shared URL — a span kind (kind=llm), a
-    // search term (q=gpt), and a sort (sort=cost&dir=asc) — then hits Reset. The
-    // reset must drop kind/q from the list and breakdown queries, drop
-    // kind/q/sort/dir from the URL, and wipe the stale view out of localStorage.
-    // A regression that leaves any one filter behind (a stale kind, q, or sort)
-    // would be caught here.
+    // (resetView), which must clear kind, search, sort, AND the active
+    // cost-breakdown filter (group/gval + bmode) *together*. A user lands with
+    // all of them active via a shared URL — a span kind (kind=llm), a search
+    // term (q=gpt), a sort (sort=cost&dir=asc), a breakdown group
+    // (group=model&gval=gpt-4o), and drill-in mode (bmode=drillin) — then hits
+    // Reset. The reset must drop kind/q/group from the list and breakdown
+    // queries, drop kind/q/sort/dir/group/gval/bmode from the URL, and wipe the
+    // stale view out of localStorage. A regression that leaves any one filter
+    // behind (a stale kind, q, sort, group, or bmode) would be caught here.
     window.localStorage.clear();
     window.history.replaceState(
       {},
       "",
-      "/traces?kind=llm&q=gpt&sort=cost&dir=asc",
+      "/traces?kind=llm&q=gpt&sort=cost&dir=asc&group=model&gval=gpt-4o&bmode=drillin",
     );
 
     render(
@@ -1517,59 +1519,78 @@ describe("Traces + DateRangeProvider shared link", () => {
       </DateRangeProvider>,
     );
 
-    // At mount all three controls are active purely from the URL: kind+q reach
-    // both the list and breakdown queries...
+    // At mount all controls are active purely from the URL: kind+q+group reach
+    // both the list and breakdown queries (the group reaches the breakdown query
+    // because bmode=drillin narrows it to the active group)...
     await waitFor(() => {
       const list = lastListParams();
       expect(list.kind).toBe("llm");
       expect(list.q).toBe("gpt");
+      expect(list.model).toBe("gpt-4o");
     });
     await waitFor(() => {
       const bd = lastBreakdownParams();
       expect(bd.kind).toBe("llm");
       expect(bd.q).toBe("gpt");
+      expect(bd.model).toBe("gpt-4o");
     });
-    // ...and kind/q/sort/dir are all live in the URL together.
+    // ...and kind/q/sort/dir/group/gval/bmode are all live in the URL together.
     const initialSearch = new URLSearchParams(window.location.search);
     expect(initialSearch.get("kind")).toBe("llm");
     expect(initialSearch.get("q")).toBe("gpt");
     expect(initialSearch.get("sort")).toBe("cost");
     expect(initialSearch.get("dir")).toBe("asc");
+    expect(initialSearch.get("group")).toBe("model");
+    expect(initialSearch.get("gval")).toBe("gpt-4o");
+    expect(initialSearch.get("bmode")).toBe("drillin");
+    // The breakdown filter chip confirms the group filter is active.
+    expect(screen.getByTestId("active-group-filter")).toHaveTextContent("gpt-4o");
 
     // Trigger the page's real one-click Reset View control.
     fireEvent.click(screen.getByTestId("button-reset-view"));
 
-    // The list and breakdown queries drop kind and q together. (Sort is applied
-    // client-side, so it never appears in the query params.)
+    // The list and breakdown queries drop kind, q, and the group together. (Sort
+    // is applied client-side, so it never appears in the query params.)
     await waitFor(() => {
       const list = lastListParams();
       expect(list.kind).toBeUndefined();
       expect(list.q).toBeUndefined();
+      expect(list.model).toBeUndefined();
     });
     await waitFor(() => {
       const bd = lastBreakdownParams();
       expect(bd.kind).toBeUndefined();
       expect(bd.q).toBeUndefined();
+      expect(bd.model).toBeUndefined();
     });
 
-    // The URL drops kind, q, sort, and dir together.
+    // The URL drops kind, q, sort, dir, group, gval, and bmode together.
     await waitFor(() => {
       const search = new URLSearchParams(window.location.search);
       expect(search.get("kind")).toBeNull();
       expect(search.get("q")).toBeNull();
       expect(search.get("sort")).toBeNull();
       expect(search.get("dir")).toBeNull();
+      expect(search.get("group")).toBeNull();
+      expect(search.get("gval")).toBeNull();
+      expect(search.get("bmode")).toBeNull();
     });
+
+    // The breakdown filter chip is gone once the group filter is cleared.
+    expect(screen.queryByTestId("active-group-filter")).toBeNull();
 
     // The reset wipes the stale view from localStorage. The persist effect
     // re-runs after reset and re-writes the *default* view, so the key may exist
-    // again — but it must no longer carry any of the cleared kind/q/sort.
+    // again — but it must no longer carry any of the cleared kind/q/sort/group/
+    // bmode.
     await waitFor(() => {
       const raw = window.localStorage.getItem(VIEW_STORAGE_KEY);
       const stored = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
       expect(stored.kind ?? "__all__").toBe("__all__");
       expect(stored.search ?? "").toBe("");
       expect(stored.sortColumn ?? null).toBeNull();
+      expect(stored.group ?? null).toBeNull();
+      expect(stored.breakdownMode ?? "navigate").toBe("navigate");
     });
 
     // The Reset control disappears once there is nothing left to reset.
@@ -1577,20 +1598,25 @@ describe("Traces + DateRangeProvider shared link", () => {
       expect(screen.queryByTestId("button-reset-view")).toBeNull();
     });
 
-    // Extra ticks prove the cleared state settled rather than a stale kind/q/sort
-    // creeping back a tick later.
+    // Extra ticks prove the cleared state settled rather than a stale
+    // kind/q/sort/group/bmode creeping back a tick later.
     await new Promise((resolve) => setTimeout(resolve, 50));
     const settled = new URLSearchParams(window.location.search);
     expect(settled.get("kind")).toBeNull();
     expect(settled.get("q")).toBeNull();
     expect(settled.get("sort")).toBeNull();
     expect(settled.get("dir")).toBeNull();
+    expect(settled.get("group")).toBeNull();
+    expect(settled.get("gval")).toBeNull();
+    expect(settled.get("bmode")).toBeNull();
     const settledList = lastListParams();
     expect(settledList.kind).toBeUndefined();
     expect(settledList.q).toBeUndefined();
+    expect(settledList.model).toBeUndefined();
     const settledBd = lastBreakdownParams();
     expect(settledBd.kind).toBeUndefined();
     expect(settledBd.q).toBeUndefined();
+    expect(settledBd.model).toBeUndefined();
   });
 
   it("re-applies the kind, search, and sort choices to a clean path after page-to-page navigation", async () => {
