@@ -264,5 +264,36 @@ describe("loadDepartmentMap + breakdown byDepartment (real SQL)", () => {
       const after = await loadDepartmentMap(client);
       assert.equal(after.get("billing-agent"), "Engineering");
     });
+
+    test("moving an employee re-attributes ALL of that employee's agents", async () => {
+      // An org change: an employee (and the whole team of agents they own) is
+      // moved from one department to another. This differs from reassigning a
+      // single agent — the agents' employee_id does not change, only the
+      // employee's department_id. Every agent owned by that employee must
+      // re-attribute to the new department on the next cache refresh.
+      await client.query(`
+        INSERT INTO agents (id, employee_id) VALUES
+          ('triage-bot', 'e1'),
+          ('deploy-bot', 'e1');
+      `);
+
+      const before = await loadDepartmentMap(client);
+      assert.equal(before.get("support-bot"), "Engineering");
+      assert.equal(before.get("triage-bot"), "Engineering");
+      assert.equal(before.get("deploy-bot"), "Engineering");
+
+      // Move employee e1 from Engineering (d1) to Finance (d2). A regression
+      // that joined on the wrong key (e.g. agent→department directly) would
+      // miss this and keep the agents in Engineering.
+      await client.query(`UPDATE employees SET department_id = 'd2' WHERE id = 'e1'`);
+      resetDepartmentMapCache();
+
+      const after = await loadDepartmentMap(client);
+      assert.equal(after.get("support-bot"), "Finance");
+      assert.equal(after.get("triage-bot"), "Finance");
+      assert.equal(after.get("deploy-bot"), "Finance");
+      // The other employee's agent is untouched by the move.
+      assert.equal(after.get("billing-agent"), "Finance");
+    });
   });
 });
