@@ -1359,6 +1359,73 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(settled.get("q")).toBe("gpt");
   });
 
+  it("keeps the drill-in breakdown narrowed to the active group when the kind filter is cleared back to All kinds", async () => {
+    // The prior test proves drill-in's narrowed breakdown survives *adding* a
+    // kind. This one fixes the *mode* and *group* and exercises the opposite
+    // direction on the kind axis: a user lands in drill-in narrowed to gpt-4o
+    // with an active kind=llm, then resets the kind back to "All kinds" via the
+    // real kind control. Clearing the kind must drop it from the narrowed
+    // breakdown query and the URL while keeping the group dimension narrowed
+    // (model=gpt-4o) and bmode=drillin. A regression could leave a stale kind in
+    // the narrowed breakdown query, or drop the group when the kind clears.
+    window.localStorage.clear();
+    window.history.replaceState(
+      {},
+      "",
+      "/traces?bmode=drillin&group=model&gval=gpt-4o&kind=llm",
+    );
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // Start pressed on drill-in purely from the URL's bmode param.
+    const drillin = await screen.findByTestId("breakdown-mode-drillin");
+    expect(drillin).toHaveAttribute("aria-pressed", "true");
+
+    // At mount the narrowed breakdown carries both the active group and kind=llm,
+    // all purely from the URL.
+    await waitFor(() => {
+      const params = lastBreakdownParams();
+      expect(params.model).toBe("gpt-4o");
+      expect(params.kind).toBe("llm");
+    });
+
+    // Reset the span kind via the real kind control: open the Radix select and
+    // click the "All kinds" option, exactly as a user would.
+    fireEvent.click(screen.getByTestId("select-kind"));
+    fireEvent.click(await screen.findByText("All kinds"));
+
+    // The breakdown keeps the group dimension but kind drops out entirely.
+    await waitFor(() => {
+      const params = lastBreakdownParams();
+      expect(params.model).toBe("gpt-4o");
+      expect(params.kind).toBeUndefined();
+    });
+    // The URL drops kind while keeping bmode=drillin and the group/gval.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("kind")).toBeNull();
+      expect(search.get("bmode")).toBe("drillin");
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+
+    // Extra ticks prove the narrowed breakdown settled rather than dropping the
+    // group or re-introducing a stale kind a tick later.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settledParams = lastBreakdownParams();
+    expect(settledParams.model).toBe("gpt-4o");
+    expect(settledParams.kind).toBeUndefined();
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("kind")).toBeNull();
+    expect(settled.get("bmode")).toBe("drillin");
+    expect(settled.get("group")).toBe("model");
+    expect(settled.get("gval")).toBe("gpt-4o");
+  });
+
   it("re-applies the kind, search, and sort choices to a clean path after page-to-page navigation", async () => {
     // Mid-session on an all-time page so there is no date range to also
     // re-apply, isolating the kind/search/sort slice of the *same* URL-sync
