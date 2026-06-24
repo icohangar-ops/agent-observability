@@ -148,6 +148,15 @@ function lastListParams(): Record<string, unknown> {
   return (call?.[0] ?? {}) as Record<string, unknown>;
 }
 
+// The most recent params object handed to the breakdown query. In "navigate"
+// mode this stays scoped to date/kind/search only; in "drillin" mode it also
+// narrows to the active group — so the presence of a group dimension here is
+// the observable proof that bmode=drillin actually reached the query.
+function lastBreakdownParams(): Record<string, unknown> {
+  const call = useGetTraceCostBreakdown.mock.calls.at(-1);
+  return (call?.[0] ?? {}) as Record<string, unknown>;
+}
+
 const DATE_STORAGE_KEY = "agent-observability:date-range";
 const VIEW_STORAGE_KEY = "agent-observability:traces-view";
 
@@ -1391,5 +1400,121 @@ describe("Traces + DateRangeProvider shared link", () => {
     } finally {
       setItemSpy.mockRestore();
     }
+  });
+
+  it("restores the drill-in breakdown mode from a cold shared URL with nothing in storage", async () => {
+    // A fresh tab opening a shared link whose only non-default param is the
+    // breakdown view mode (bmode=drillin), with nothing remembered in
+    // localStorage to fall back on. initialView() must read bmode straight off
+    // the URL so the "Drill in" toggle starts active, and the URL-sync effect
+    // must keep bmode=drillin rather than stripping it back to the default.
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/traces?bmode=drillin");
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // The "Drill in" toggle is active purely from the URL.
+    const drillin = await screen.findByTestId("breakdown-mode-drillin");
+    expect(drillin).toHaveAttribute("aria-pressed", "true");
+    // ...and "Navigate" is correspondingly inactive.
+    expect(screen.getByTestId("breakdown-mode-navigate")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+
+    // The URL keeps bmode=drillin after the sync effect runs.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("bmode")).toBe("drillin");
+    });
+
+    // Extra ticks must prove the URL has settled rather than ping-ponging the
+    // mode away (e.g. back to the default "navigate", which writes no bmode).
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("bmode")).toBe("drillin");
+    expect(screen.getByTestId("breakdown-mode-drillin")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("restores bmode, range, and the breakdown filter together from a cold shared URL without clobbering each other", async () => {
+    // A fresh tab opening a fully-loaded shared link: the breakdown view mode
+    // (bmode=drillin), the date range (range=7d), and the active group filter
+    // (group=model&gval=gpt-4o) are all present at mount, with nothing in
+    // localStorage. None of the three URL-sync paths (Traces' view effect and
+    // the provider's range effect over the same query string) may clobber the
+    // others, and bmode=drillin must actually reach the breakdown query.
+    window.localStorage.clear();
+    window.history.replaceState(
+      {},
+      "",
+      "/traces?bmode=drillin&range=7d&group=model&gval=gpt-4o",
+    );
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // The "Drill in" toggle and the group filter are both active from the URL.
+    const drillin = await screen.findByTestId("breakdown-mode-drillin");
+    expect(drillin).toHaveAttribute("aria-pressed", "true");
+    const chip = screen.getByTestId("active-group-filter");
+    expect(chip).toHaveTextContent("Model:");
+    expect(chip).toHaveTextContent("gpt-4o");
+    expect(screen.getByTestId("breakdown-row-gpt-4o")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    // The 7d window and the group filter reach the list query together.
+    const today = new Date();
+    const expectedFrom = format(subDays(today, 6), "yyyy-MM-dd");
+    const expectedTo = format(today, "yyyy-MM-dd");
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.model).toBe("gpt-4o");
+      expect(params.from).toBe(expectedFrom);
+      expect(params.to).toBe(expectedTo);
+    });
+
+    // Drill-in mode narrows the breakdown query to the active group too — proof
+    // that bmode=drillin reached the query, not just the toggle's appearance.
+    await waitFor(() => {
+      const bparams = lastBreakdownParams();
+      expect(bparams.model).toBe("gpt-4o");
+      expect(bparams.from).toBe(expectedFrom);
+      expect(bparams.to).toBe(expectedTo);
+    });
+
+    // After all effects settle, the URL keeps bmode, range, and group/gval.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("bmode")).toBe("drillin");
+      expect(search.get("range")).toBe("7d");
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+
+    // Extra ticks must prove none of the three params ping-pongs out.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("bmode")).toBe("drillin");
+    expect(settled.get("range")).toBe("7d");
+    expect(settled.get("group")).toBe("model");
+    expect(settled.get("gval")).toBe("gpt-4o");
+    const settledParams = lastListParams();
+    expect(settledParams.model).toBe("gpt-4o");
+    expect(settledParams.from).toBe(expectedFrom);
+    expect(settledParams.to).toBe(expectedTo);
+    const settledBreakdown = lastBreakdownParams();
+    expect(settledBreakdown.model).toBe("gpt-4o");
   });
 });
