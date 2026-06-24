@@ -1494,6 +1494,105 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(settled.get("gval")).toBe("gpt-4o");
   });
 
+  it("clears kind, search, and sort together when the Reset View control is used", async () => {
+    // Tasks #101/#102/#103 each clear a *single* control (kind back to All
+    // kinds, the search box). This covers the page's one-click Reset View path
+    // (resetView), which must clear kind, search, AND sort *together*. A user
+    // lands with all three active via a shared URL — a span kind (kind=llm), a
+    // search term (q=gpt), and a sort (sort=cost&dir=asc) — then hits Reset. The
+    // reset must drop kind/q from the list and breakdown queries, drop
+    // kind/q/sort/dir from the URL, and wipe the stale view out of localStorage.
+    // A regression that leaves any one filter behind (a stale kind, q, or sort)
+    // would be caught here.
+    window.localStorage.clear();
+    window.history.replaceState(
+      {},
+      "",
+      "/traces?kind=llm&q=gpt&sort=cost&dir=asc",
+    );
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // At mount all three controls are active purely from the URL: kind+q reach
+    // both the list and breakdown queries...
+    await waitFor(() => {
+      const list = lastListParams();
+      expect(list.kind).toBe("llm");
+      expect(list.q).toBe("gpt");
+    });
+    await waitFor(() => {
+      const bd = lastBreakdownParams();
+      expect(bd.kind).toBe("llm");
+      expect(bd.q).toBe("gpt");
+    });
+    // ...and kind/q/sort/dir are all live in the URL together.
+    const initialSearch = new URLSearchParams(window.location.search);
+    expect(initialSearch.get("kind")).toBe("llm");
+    expect(initialSearch.get("q")).toBe("gpt");
+    expect(initialSearch.get("sort")).toBe("cost");
+    expect(initialSearch.get("dir")).toBe("asc");
+
+    // Trigger the page's real one-click Reset View control.
+    fireEvent.click(screen.getByTestId("button-reset-view"));
+
+    // The list and breakdown queries drop kind and q together. (Sort is applied
+    // client-side, so it never appears in the query params.)
+    await waitFor(() => {
+      const list = lastListParams();
+      expect(list.kind).toBeUndefined();
+      expect(list.q).toBeUndefined();
+    });
+    await waitFor(() => {
+      const bd = lastBreakdownParams();
+      expect(bd.kind).toBeUndefined();
+      expect(bd.q).toBeUndefined();
+    });
+
+    // The URL drops kind, q, sort, and dir together.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("kind")).toBeNull();
+      expect(search.get("q")).toBeNull();
+      expect(search.get("sort")).toBeNull();
+      expect(search.get("dir")).toBeNull();
+    });
+
+    // The reset wipes the stale view from localStorage. The persist effect
+    // re-runs after reset and re-writes the *default* view, so the key may exist
+    // again — but it must no longer carry any of the cleared kind/q/sort.
+    await waitFor(() => {
+      const raw = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      const stored = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      expect(stored.kind ?? "__all__").toBe("__all__");
+      expect(stored.search ?? "").toBe("");
+      expect(stored.sortColumn ?? null).toBeNull();
+    });
+
+    // The Reset control disappears once there is nothing left to reset.
+    await waitFor(() => {
+      expect(screen.queryByTestId("button-reset-view")).toBeNull();
+    });
+
+    // Extra ticks prove the cleared state settled rather than a stale kind/q/sort
+    // creeping back a tick later.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("kind")).toBeNull();
+    expect(settled.get("q")).toBeNull();
+    expect(settled.get("sort")).toBeNull();
+    expect(settled.get("dir")).toBeNull();
+    const settledList = lastListParams();
+    expect(settledList.kind).toBeUndefined();
+    expect(settledList.q).toBeUndefined();
+    const settledBd = lastBreakdownParams();
+    expect(settledBd.kind).toBeUndefined();
+    expect(settledBd.q).toBeUndefined();
+  });
+
   it("re-applies the kind, search, and sort choices to a clean path after page-to-page navigation", async () => {
     // Mid-session on an all-time page so there is no date range to also
     // re-apply, isolating the kind/search/sort slice of the *same* URL-sync
