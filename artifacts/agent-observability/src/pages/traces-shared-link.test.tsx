@@ -1056,4 +1056,67 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(settledParams.from).toBeUndefined();
     expect(settledParams.to).toBeUndefined();
   });
+
+  it("still applies the date range when localStorage.setItem throws", async () => {
+    // Private-mode / quota-exceeded / storage-disabled browsers throw on every
+    // setItem. The provider's persist effect wraps the write in try/catch, so a
+    // throw here must not crash the app: the chosen range must still reach the
+    // list query and the shared URL for the current session. This is the
+    // write-failure twin of the malformed-JSON read-failure case above.
+    // jsdom's localStorage delegates setItem to Storage.prototype, so the spy
+    // must target the prototype (an instance spy is never hit).
+    const setItemSpy = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new DOMException("storage is disabled", "SecurityError");
+      });
+
+    try {
+      window.history.replaceState({}, "", "/traces");
+
+      render(
+        <DateRangeProvider>
+          <PresetControls />
+          <Traces />
+        </DateRangeProvider>,
+      );
+
+      // Mount must not crash even though the initial persist write throws.
+      expect(screen.getByTestId("apply-7d")).toBeInTheDocument();
+
+      // Apply a 7d range exactly as the date picker would. The persist write
+      // throws again, but the range must still take effect for this session.
+      fireEvent.click(screen.getByTestId("apply-7d"));
+
+      const today = new Date();
+      const expectedFrom = format(subDays(today, 6), "yyyy-MM-dd");
+      const expectedTo = format(today, "yyyy-MM-dd");
+
+      // The 7d window reaches the list query despite the storage write failing.
+      await waitFor(() => {
+        const params = lastListParams();
+        expect(params.from).toBe(expectedFrom);
+        expect(params.to).toBe(expectedTo);
+      });
+
+      // And it reaches the shared URL so the filter is still shareable.
+      await waitFor(() => {
+        const search = new URLSearchParams(window.location.search);
+        expect(search.get("range")).toBe("7d");
+      });
+
+      // Prove the write was actually attempted (and thus actually threw).
+      expect(setItemSpy).toHaveBeenCalled();
+
+      // Extra ticks must keep the range live rather than ping-ponging away.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const settled = new URLSearchParams(window.location.search);
+      expect(settled.get("range")).toBe("7d");
+      const settledParams = lastListParams();
+      expect(settledParams.from).toBe(expectedFrom);
+      expect(settledParams.to).toBe(expectedTo);
+    } finally {
+      setItemSpy.mockRestore();
+    }
+  });
 });
