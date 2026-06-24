@@ -1426,6 +1426,74 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(settled.get("gval")).toBe("gpt-4o");
   });
 
+  it("keeps the drill-in breakdown narrowed to the active group when the search term is cleared", async () => {
+    // The kind axis already has both directions covered (#101 adds a kind, #102
+    // clears it back to "All kinds"). This is the matching reverse case for the
+    // *search* axis: a user lands in drill-in narrowed to gpt-4o with a non-empty
+    // search (q=gpt), then clears the search box. Clearing the search must drop q
+    // from the narrowed breakdown query and the URL while keeping the group
+    // dimension narrowed (model=gpt-4o) and bmode=drillin. A regression could
+    // leave a stale q in the narrowed breakdown query, or drop the group when the
+    // search clears.
+    window.localStorage.clear();
+    window.history.replaceState(
+      {},
+      "",
+      "/traces?bmode=drillin&group=model&gval=gpt-4o&q=gpt",
+    );
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // Start pressed on drill-in purely from the URL's bmode param.
+    const drillin = await screen.findByTestId("breakdown-mode-drillin");
+    expect(drillin).toHaveAttribute("aria-pressed", "true");
+
+    // At mount the narrowed breakdown carries both the active group and q=gpt,
+    // all purely from the URL.
+    await waitFor(() => {
+      const params = lastBreakdownParams();
+      expect(params.model).toBe("gpt-4o");
+      expect(params.q).toBe("gpt");
+    });
+
+    // Clear the search via the real search box, exactly as a user would by
+    // selecting the text and deleting it.
+    fireEvent.change(screen.getByTestId("input-search-traces"), {
+      target: { value: "" },
+    });
+
+    // The breakdown keeps the group dimension but q drops out entirely.
+    await waitFor(() => {
+      const params = lastBreakdownParams();
+      expect(params.model).toBe("gpt-4o");
+      expect(params.q).toBeUndefined();
+    });
+    // The URL drops q while keeping bmode=drillin and the group/gval.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("q")).toBeNull();
+      expect(search.get("bmode")).toBe("drillin");
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+
+    // Extra ticks prove the narrowed breakdown settled rather than dropping the
+    // group or re-introducing a stale q a tick later.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settledParams = lastBreakdownParams();
+    expect(settledParams.model).toBe("gpt-4o");
+    expect(settledParams.q).toBeUndefined();
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("q")).toBeNull();
+    expect(settled.get("bmode")).toBe("drillin");
+    expect(settled.get("group")).toBe("model");
+    expect(settled.get("gval")).toBe("gpt-4o");
+  });
+
   it("re-applies the kind, search, and sort choices to a clean path after page-to-page navigation", async () => {
     // Mid-session on an all-time page so there is no date range to also
     // re-apply, isolating the kind/search/sort slice of the *same* URL-sync
