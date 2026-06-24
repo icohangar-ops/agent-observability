@@ -755,15 +755,28 @@ type BudgetRow = {
   period: string;
 };
 
+// Minimal structural type for a Postgres query executor. Lets callers inject a
+// transaction-scoped client (e.g. in tests) in place of the shared pool while
+// keeping the exact same SQL.
+type SqlExecutor = {
+  query: (
+    text: string,
+    params?: unknown[],
+  ) => Promise<{ rows: Array<Record<string, unknown>> }>;
+};
+
 // Fetch budgets (optionally for a single department) with current-month spend.
-async function budgetRows(departmentId?: string): Promise<BudgetRow[]> {
+export async function budgetRows(
+  departmentId?: string,
+  exec: SqlExecutor = pool as unknown as SqlExecutor,
+): Promise<BudgetRow[]> {
   const params: string[] = [];
   let where = "";
   if (departmentId) {
     params.push(departmentId);
     where = `WHERE b.department_id = $1`;
   }
-  const q = await pool.query(
+  const q = await exec.query(
     `
     SELECT
       b.id,
@@ -797,15 +810,15 @@ async function budgetRows(departmentId?: string): Promise<BudgetRow[]> {
     const spend = num(r.spend);
     return {
       id: num(r.id),
-      departmentId: r.department_id,
-      departmentName: r.department_name,
-      modelId: r.model_id,
-      modelName: r.model_name,
+      departmentId: r.department_id as string,
+      departmentName: r.department_name as string,
+      modelId: r.model_id as string | null,
+      modelName: r.model_name as string | null,
       amount,
       spend,
       utilization: amount > 0 ? spend / amount : 0,
       status: budgetStatus(spend, amount),
-      period: r.period,
+      period: r.period as string,
     };
   });
 }

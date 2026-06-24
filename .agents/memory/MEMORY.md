@@ -6,3 +6,4 @@
 - [Datadog LLM Observability API](datadog-llm-obs.md) — Export search: type "spans", filter from/to as STRINGS, 500 "No valid indexes" = no data; ingest: 202, llm-kind IO must be messages not value.
 - [api-client dist staleness](api-client-codegen-staleness.md) — artifact tsc reads client dist (not src); "no exported member" with stale dist → run api-spec codegen first.
 - [Frontend vitest setup](frontend-vitest.md) — agent-observability uses vitest@3 + jsdom + Testing Library; mock api hooks & @/lib/date-range; Skeleton has no data-slot (match .animate-pulse).
+- [Real-SQL tests against Postgres](real-sql-tests.md) — observability suite stubs pool.query; to test actual SQL (e.g. date windows), inject a tx client + TEMP tables in BEGIN/ROLLBACK.
