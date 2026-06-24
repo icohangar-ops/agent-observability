@@ -247,4 +247,27 @@ describe("Traces page breakdown click-to-filter", () => {
       "true",
     );
   });
+
+  it("restores an active group filter from a cold shared URL (no localStorage)", () => {
+    // Simulate opening a shared link in a fresh tab: the query string is present
+    // at mount and there is no remembered view in localStorage.
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/traces?group=model&gval=gpt-4o");
+
+    try {
+      render(<Traces />);
+
+      // The chip is shown and the query is scoped purely from the URL params.
+      expect(screen.getByTestId("active-group-filter")).toHaveTextContent("Model:");
+      expect(screen.getByTestId("active-group-filter")).toHaveTextContent("gpt-4o");
+      expect(lastListParams().model).toBe("gpt-4o");
+      expect(screen.getByTestId("breakdown-row-gpt-4o")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    } finally {
+      // Reset the URL so it does not leak into other tests.
+      window.history.replaceState({}, "", "/traces");
+    }
+  });
 });
