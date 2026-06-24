@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { TraceDetail as TraceDetailData, TraceSpan } from "@workspace/api-client-react";
 
@@ -24,6 +24,7 @@ vi.mock("wouter", () => ({
 }));
 
 import TraceDetail from "./trace-detail";
+import { Toaster } from "@/components/ui/toaster";
 
 type QueryResult<T> = { data: T | undefined; isLoading: boolean };
 
@@ -161,5 +162,70 @@ describe("TraceDetail span timeline nesting", () => {
     // projected offset puts it (50%), not pushed by the 32px label padding.
     expect(indentContainer("grandchild").style.paddingLeft).toBe("32px");
     expect(barElement("grandchild").style.left).toBe("50%");
+  });
+});
+
+describe("TraceDetail copy toast auto-dismiss", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // A single span carrying JSON input so the IOBlock renders its CopyButton.
+    const base = traceResult().data!;
+    useGetTrace.mockReturnValue({
+      data: {
+        ...base,
+        spans: [span({ spanId: "root", name: "root", input: '{"q":"hi"}' })],
+        spanCount: 1,
+        errorCount: 0,
+      },
+      isLoading: false,
+    });
+  });
+
+  it("auto-dismisses the copy toast after the default window when the user does nothing", async () => {
+    // The copy toast sets no explicit duration, so it leans entirely on the
+    // shared toast component's default auto-dismiss. A regression that bumps
+    // that default (or sets it to Infinity) would leave this toast pinned
+    // forever, so guard that it clears itself with no user action.
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+
+    render(
+      <>
+        <TraceDetail />
+        <Toaster />
+      </>,
+    );
+
+    // Expand the span row to reveal the Copy button, then trigger a copy.
+    fireEvent.click(screen.getByTestId("row-trace-span-root"));
+    const copyButton = screen.getByTestId("button-copy-input-root");
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(copyButton);
+
+      // The clipboard write rejects on a microtask; flush it so the catch
+      // dispatches the toast before we start advancing fake timers.
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByText("Couldn't copy to clipboard")).toBeInTheDocument();
+
+      // Just before the default auto-dismiss window elapses it is still shown.
+      act(() => {
+        vi.advanceTimersByTime(4000);
+      });
+      expect(screen.getByText("Couldn't copy to clipboard")).toBeInTheDocument();
+
+      // Once the default window passes, the toast dismisses itself.
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.queryByText("Couldn't copy to clipboard")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
