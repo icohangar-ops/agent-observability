@@ -1,6 +1,6 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { format, subDays } from "date-fns";
+import { format, startOfMonth, subDays } from "date-fns";
 import type {
   TraceList,
   TraceSummary,
@@ -25,12 +25,17 @@ vi.mock("@workspace/api-client-react", () => ({
 import Traces from "./traces";
 import { DateRangeProvider, useDateRange } from "@/lib/date-range";
 
+// A fixed custom window the tests apply via the provider's setCustomRange
+// surface — the same call the date picker makes when a user picks from/to.
+const CUSTOM_FROM = "2026-01-05";
+const CUSTOM_TO = "2026-02-10";
+
 // A minimal stand-in for the real DateRangeSelector: it drives the *same*
-// `selectPreset` surface the provider exposes, so a test can change the date
-// range mid-session exactly the way the date picker would, while Traces runs
-// its own URL-sync effect against the same query string.
+// `selectPreset` / `setCustomRange` surfaces the provider exposes, so a test
+// can change the date range mid-session exactly the way the date picker would,
+// while Traces runs its own URL-sync effect against the same query string.
 function PresetControls() {
-  const { selectPreset } = useDateRange();
+  const { selectPreset, setCustomRange } = useDateRange();
   return (
     <>
       <button
@@ -46,6 +51,20 @@ function PresetControls() {
         onClick={() => selectPreset("30d")}
       >
         30d
+      </button>
+      <button
+        type="button"
+        data-testid="apply-month"
+        onClick={() => selectPreset("month")}
+      >
+        This month
+      </button>
+      <button
+        type="button"
+        data-testid="apply-custom"
+        onClick={() => setCustomRange(CUSTOM_FROM, CUSTOM_TO)}
+      >
+        Custom
       </button>
       <button
         type="button"
@@ -353,6 +372,154 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(settledParams.model).toBe("gpt-4o");
     expect(settledParams.from).toBe(from30d);
     expect(settledParams.to).toBe(to30d);
+  });
+
+  it("rewrites the date window to the month preset but keeps the breakdown filter", async () => {
+    // Mid-session: open on a concrete 7d range so range/from/to are live in the
+    // URL and the list query, with nothing in localStorage to seed it.
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/traces?range=7d");
+
+    render(
+      <DateRangeProvider>
+        <PresetControls />
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    const today = new Date();
+    const from7d = format(subDays(today, 6), "yyyy-MM-dd");
+    const to7d = format(today, "yyyy-MM-dd");
+    const fromMonth = format(startOfMonth(today), "yyyy-MM-dd");
+    const toMonth = format(today, "yyyy-MM-dd");
+
+    // The 7d window reaches the list query at mount.
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.from).toBe(from7d);
+      expect(params.to).toBe(to7d);
+    });
+
+    // 1) Activate a breakdown filter by clicking a row.
+    fireEvent.click(screen.getByTestId("breakdown-row-gpt-4o"));
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+    // Both the 7d range and the group are live together before the switch.
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.model).toBe("gpt-4o");
+      expect(params.from).toBe(from7d);
+      expect(params.to).toBe(to7d);
+    });
+
+    // 2) Switch to the "This month" preset via the provider surface.
+    fireEvent.click(screen.getByTestId("apply-month"));
+
+    // The list query updates from/to to the month window but keeps the group.
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.model).toBe("gpt-4o");
+      expect(params.from).toBe(fromMonth);
+      expect(params.to).toBe(toMonth);
+    });
+
+    // The URL records range=month while leaving group/gval intact. (The month
+    // preset is derived, so its concrete from/to live in the query, not the URL.)
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("range")).toBe("month");
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+
+    // Extra ticks must not revert the range or drop the group (no ping-pong).
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("range")).toBe("month");
+    expect(settled.get("group")).toBe("model");
+    expect(settled.get("gval")).toBe("gpt-4o");
+    const settledParams = lastListParams();
+    expect(settledParams.model).toBe("gpt-4o");
+    expect(settledParams.from).toBe(fromMonth);
+    expect(settledParams.to).toBe(toMonth);
+  });
+
+  it("writes a custom from/to window to the URL but keeps the breakdown filter", async () => {
+    // Mid-session: open on a concrete 7d range so range/from/to are live in the
+    // URL and the list query, with nothing in localStorage to seed it.
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/traces?range=7d");
+
+    render(
+      <DateRangeProvider>
+        <PresetControls />
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    const today = new Date();
+    const from7d = format(subDays(today, 6), "yyyy-MM-dd");
+    const to7d = format(today, "yyyy-MM-dd");
+
+    // The 7d window reaches the list query at mount.
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.from).toBe(from7d);
+      expect(params.to).toBe(to7d);
+    });
+
+    // 1) Activate a breakdown filter by clicking a row.
+    fireEvent.click(screen.getByTestId("breakdown-row-gpt-4o"));
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+    // Both the 7d range and the group are live together before the switch.
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.model).toBe("gpt-4o");
+      expect(params.from).toBe(from7d);
+      expect(params.to).toBe(to7d);
+    });
+
+    // 2) Apply a custom from/to range via the provider surface.
+    fireEvent.click(screen.getByTestId("apply-custom"));
+
+    // The list query updates from/to to the custom window but keeps the group.
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.model).toBe("gpt-4o");
+      expect(params.from).toBe(CUSTOM_FROM);
+      expect(params.to).toBe(CUSTOM_TO);
+    });
+
+    // A custom range writes range=custom plus its concrete from/to to the URL,
+    // all while leaving group/gval intact.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("range")).toBe("custom");
+      expect(search.get("from")).toBe(CUSTOM_FROM);
+      expect(search.get("to")).toBe(CUSTOM_TO);
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+
+    // Extra ticks must not revert the range or drop the group (no ping-pong).
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("range")).toBe("custom");
+    expect(settled.get("from")).toBe(CUSTOM_FROM);
+    expect(settled.get("to")).toBe(CUSTOM_TO);
+    expect(settled.get("group")).toBe("model");
+    expect(settled.get("gval")).toBe("gpt-4o");
+    const settledParams = lastListParams();
+    expect(settledParams.model).toBe("gpt-4o");
+    expect(settledParams.from).toBe(CUSTOM_FROM);
+    expect(settledParams.to).toBe(CUSTOM_TO);
   });
 
   it("persists the restored range and group so they outlive the shared link", async () => {
