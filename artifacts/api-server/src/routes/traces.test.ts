@@ -71,6 +71,7 @@ interface TraceCostGroup {
   spanCount: number;
   totalTokens: number;
   costShare: number;
+  rawTags?: string[];
 }
 
 interface TraceBreakdownResponse {
@@ -356,6 +357,14 @@ describe("traces routes", () => {
       body.byDepartment.map((g) => [g.key, g.cost, g.spanCount]),
       [["Engineering", 6, 3]],
     );
+    // The collapsed bucket exposes the distinct raw tag values (full prefix +
+    // original casing, sorted) that fed it, so casing/prefix variants behind a
+    // single canonical department are auditable.
+    assert.deepEqual(body.byDepartment[0].rawTags, [
+      "department:engineering",
+      "dept:Engineering",
+      "team:ENGINEERING",
+    ]);
   });
 
   test("GET /traces filters by department case-insensitively", async () => {
@@ -430,6 +439,9 @@ describe("traces routes", () => {
       ["(unattributed)"],
     );
     assert.equal(body.byDepartment[0].cost, 5);
+    // Spans with no department tag (bucketed via ml_app or unattributed)
+    // contribute no raw tag, so the bucket exposes an empty rawTags list.
+    assert.deepEqual(body.byDepartment[0].rawTags, []);
   });
 
   test("GET /traces/breakdown respects kind and search filters", async () => {

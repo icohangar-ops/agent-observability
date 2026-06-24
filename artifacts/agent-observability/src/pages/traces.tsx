@@ -42,6 +42,7 @@ import {
   Cpu,
   Boxes,
   Building2,
+  Tag,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -316,6 +317,20 @@ function BreakdownCard({
                       {Math.round(g.costShare * 100)}%
                     </span>
                   </div>
+                  {g.rawTags && g.rawTags.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                      <Tag className="size-3 text-muted-foreground shrink-0" />
+                      {g.rawTags.map((tag) => (
+                        <span
+                          key={tag}
+                          title={`Raw span tag: ${tag}`}
+                          className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </button>
               );
             })}

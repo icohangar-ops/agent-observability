@@ -364,6 +364,8 @@ export interface TraceCostGroup {
   totalTokens: number;
   /** Fraction of the matching spans' total estimated cost (0-1) */
   costShare: number;
+  /** For department groups only: the distinct raw span tag values (e.g. "department:finance", "team:Finance") that mapped into this canonical bucket. Lets users audit casing/prefix variants and typo'd tags behind a department. Spans bucketed via the ml_app → directory mapping contribute no tag. Absent for model and app groups. */
+  rawTags?: string[];
 }
 
 export interface TraceCostBreakdown {

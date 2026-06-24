@@ -63,23 +63,37 @@ export interface CostGroup {
   spanCount: number;
   totalTokens: number;
   costShare: number;
+  rawTags?: string[];
 }
 
 // Group spans by an arbitrary key (model or ml_app), summing the Datadog
 // estimated cost and tokens, sorted by cost descending. `costShare` is each
-// group's fraction of the total estimated cost across all spans (0-1).
+// group's fraction of the total estimated cost across all spans (0-1). When
+// `rawTagOf` is supplied, the distinct non-null values it returns per span are
+// collected into `rawTags` — used by the department breakdown to surface the raw
+// span tag values (e.g. "department:finance", "team:Finance") behind a canonical
+// bucket so casing/typo variants are auditable.
 export function groupByCost(
   spans: NormalizedSpan[],
   keyOf: (s: NormalizedSpan) => string,
+  rawTagOf?: (s: NormalizedSpan) => string | null,
 ): CostGroup[] {
   const totalCost = spans.reduce((acc, s) => acc + s.estimatedCostUsd, 0);
-  const map = new Map<string, { cost: number; spanCount: number; totalTokens: number }>();
+  const map = new Map<
+    string,
+    { cost: number; spanCount: number; totalTokens: number; rawTags: Set<string> }
+  >();
   for (const s of spans) {
     const key = keyOf(s);
-    const entry = map.get(key) ?? { cost: 0, spanCount: 0, totalTokens: 0 };
+    const entry =
+      map.get(key) ?? { cost: 0, spanCount: 0, totalTokens: 0, rawTags: new Set<string>() };
     entry.cost += s.estimatedCostUsd;
     entry.spanCount += 1;
     entry.totalTokens += s.totalTokens;
+    if (rawTagOf) {
+      const tag = rawTagOf(s);
+      if (tag) entry.rawTags.add(tag);
+    }
     map.set(key, entry);
   }
   return Array.from(map.entries())
@@ -89,6 +103,7 @@ export function groupByCost(
       spanCount: v.spanCount,
       totalTokens: v.totalTokens,
       costShare: totalCost > 0 ? v.cost / totalCost : 0,
+      ...(rawTagOf ? { rawTags: Array.from(v.rawTags).sort() } : {}),
     }))
     .sort((a, b) => b.cost - a.cost);
 }
@@ -185,6 +200,21 @@ export function departmentOf(
     if (dept) return dept;
   }
   return "(unattributed)";
+}
+
+// The raw, unmodified span tag (e.g. "department:finance", "team:Finance") that
+// `departmentOf` used to bucket this span — i.e. its first department/dept/team
+// tag. Returns null for spans bucketed via the ml_app → directory mapping (which
+// carry no department tag). Surfacing these distinct raw values per canonical
+// bucket lets teams spot casing/prefix variants and typos in their tagging.
+function departmentTagOf(span: NormalizedSpan): string | null {
+  for (const tag of span.tags) {
+    const m = DEPT_TAG_RE.exec(tag);
+    if (m && m[1].trim() !== "") {
+      return tag.trim();
+    }
+  }
+  return null;
 }
 
 function summarize(spans: NormalizedSpan[]) {
@@ -297,8 +327,10 @@ router.get("/traces/breakdown", async (req, res) => {
   const canonicalDepartments = buildCanonicalDepartments(filtered, mlAppToDept);
   const byModel = groupByCost(filtered, (s) => s.model ?? "(no model)");
   const byApp = groupByCost(filtered, (s) => s.mlApp ?? "(no app)");
-  const byDepartment = groupByCost(filtered, (s) =>
-    departmentOf(s, mlAppToDept, canonicalDepartments),
+  const byDepartment = groupByCost(
+    filtered,
+    (s) => departmentOf(s, mlAppToDept, canonicalDepartments),
+    (s) => departmentTagOf(s),
   );
   res.json({ noData, byModel, byApp, byDepartment });
 });

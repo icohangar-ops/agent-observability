@@ -569,21 +569,24 @@ export const GetTraceCostBreakdownResponse = zod.object({
   "cost": zod.number().describe('Total Datadog-estimated cost in USD for spans in this group'),
   "spanCount": zod.number(),
   "totalTokens": zod.number(),
-  "costShare": zod.number().describe('Fraction of the matching spans\' total estimated cost (0-1)')
+  "costShare": zod.number().describe('Fraction of the matching spans\' total estimated cost (0-1)'),
+  "rawTags": zod.array(zod.string()).optional().describe('For department groups only: the distinct raw span tag values (e.g. \"department:finance\", \"team:Finance\") that mapped into this canonical bucket. Lets users audit casing\/prefix variants and typo\'d tags behind a department. Spans bucketed via the ml_app → directory mapping contribute no tag. Absent for model and app groups.')
 })).describe('Estimated cost grouped by model, sorted by cost descending.'),
   "byApp": zod.array(zod.object({
   "key": zod.string().describe('Group label — the model name or ml_app\/agent. Falls back to a placeholder like \"(no model)\" when the span has none.'),
   "cost": zod.number().describe('Total Datadog-estimated cost in USD for spans in this group'),
   "spanCount": zod.number(),
   "totalTokens": zod.number(),
-  "costShare": zod.number().describe('Fraction of the matching spans\' total estimated cost (0-1)')
+  "costShare": zod.number().describe('Fraction of the matching spans\' total estimated cost (0-1)'),
+  "rawTags": zod.array(zod.string()).optional().describe('For department groups only: the distinct raw span tag values (e.g. \"department:finance\", \"team:Finance\") that mapped into this canonical bucket. Lets users audit casing\/prefix variants and typo\'d tags behind a department. Spans bucketed via the ml_app → directory mapping contribute no tag. Absent for model and app groups.')
 })).describe('Estimated cost grouped by ml_app (agent), sorted by cost descending.'),
   "byDepartment": zod.array(zod.object({
   "key": zod.string().describe('Group label — the model name or ml_app\/agent. Falls back to a placeholder like \"(no model)\" when the span has none.'),
   "cost": zod.number().describe('Total Datadog-estimated cost in USD for spans in this group'),
   "spanCount": zod.number(),
   "totalTokens": zod.number(),
-  "costShare": zod.number().describe('Fraction of the matching spans\' total estimated cost (0-1)')
+  "costShare": zod.number().describe('Fraction of the matching spans\' total estimated cost (0-1)'),
+  "rawTags": zod.array(zod.string()).optional().describe('For department groups only: the distinct raw span tag values (e.g. \"department:finance\", \"team:Finance\") that mapped into this canonical bucket. Lets users audit casing\/prefix variants and typo\'d tags behind a department. Spans bucketed via the ml_app → directory mapping contribute no tag. Absent for model and app groups.')
 })).describe('Estimated cost grouped by department\/team, sorted by cost descending. Department is derived from an explicit department\/dept\/ team span tag, falling back to the span\'s ml_app → agent → owning department mapping; spans with neither fall under \"(unattributed)\".')
 })
 
