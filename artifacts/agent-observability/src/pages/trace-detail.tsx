@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link, useParams } from "wouter";
 import { useGetTrace, type TraceSpan } from "@workspace/api-client-react";
 import { useDateRange } from "@/lib/date-range";
+import { prettyPrint } from "@/lib/json-highlight";
 import { formatTokens, formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -126,23 +127,6 @@ function computeDepths(spans: TraceSpan[]): Map<string, number> {
   };
   for (const s of spans) resolve(s, new Set([s.spanId]));
   return depths;
-}
-
-// Pretty-print JSON-looking strings so large tool payloads are readable; leave
-// plain text (and anything that doesn't parse) untouched. `isJson` tells the
-// renderer whether to apply syntax highlighting.
-function prettyPrint(value: string): { text: string; isJson: boolean; data?: unknown } {
-  const trimmed = value.trim();
-  const looksJson =
-    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-    (trimmed.startsWith("[") && trimmed.endsWith("]"));
-  if (!looksJson) return { text: value, isJson: false };
-  try {
-    const parsed = JSON.parse(trimmed);
-    return { text: JSON.stringify(parsed, null, 2), isJson: true, data: parsed };
-  } catch {
-    return { text: value, isJson: false };
-  }
 }
 
 // Color-code a primitive JSON value into a themed span. Theme-aware via Tailwind
