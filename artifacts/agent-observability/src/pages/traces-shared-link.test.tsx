@@ -715,6 +715,53 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(lastListParams().model).toBe("gpt-4o");
   });
 
+  it("re-applies the breakdown view mode to a clean path after page-to-page navigation", async () => {
+    // Mid-session on an all-time page so there is no date range or breakdown
+    // group filter to also re-apply — the only non-default choice is the
+    // breakdown view mode (bmode), isolating its slice of the *same* URL-sync
+    // effect that #85/#87/#89 proved for the date range, group, kind, search,
+    // and sort. A regression here would silently reset the user's breakdown
+    // mode the moment they move to another page.
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/traces");
+
+    render(
+      <DateRangeProvider>
+        <NavControls />
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // 1) Switch the breakdown mode to the non-default "drillin" via the real
+    // toggle the page renders.
+    fireEvent.click(screen.getByTestId("breakdown-mode-drillin"));
+
+    // The mode lands in the live URL on the original page.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("bmode")).toBe("drillin");
+    });
+
+    // 2) Move to another page via wouter navigation, which lands on a fresh path
+    // carrying *no* query string (exactly what a <Link> does).
+    fireEvent.click(screen.getByTestId("nav-overview"));
+
+    // The destination path is reached and starts with no query of its own, then
+    // the Traces URL-sync effect re-writes the breakdown mode back onto it.
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/overview");
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("bmode")).toBe("drillin");
+    });
+
+    // Extra ticks must prove the mode has truly settled on the new path rather
+    // than being dropped a tick later (the regression #85/#87/#89 guard against).
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(window.location.pathname).toBe("/overview");
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("bmode")).toBe("drillin");
+  });
+
   it("re-applies the kind, search, and sort choices to a clean path after page-to-page navigation", async () => {
     // Mid-session on an all-time page so there is no date range to also
     // re-apply, isolating the kind/search/sort slice of the *same* URL-sync
