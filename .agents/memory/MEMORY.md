@@ -4,3 +4,5 @@
 - [drizzle-kit push prompt](drizzle-kit-push.md) — adding unique/not-null to a populated table prompts to truncate; fails non-TTY (push-force won't help). TRUNCATE first.
 - [GitHub/Codeberg mirror sync](mirror-sync.md) — post-merge pushes main to both mirrors via inline credential helper; Codeberg 504s intermittently, needs retries + generous timeout.
 - [Datadog LLM Observability API](datadog-llm-obs.md) — Export search: type "spans", filter from/to as STRINGS, 500 "No valid indexes" = no data; ingest: 202, llm-kind IO must be messages not value.
+- [api-client dist staleness](api-client-codegen-staleness.md) — artifact tsc reads client dist (not src); "no exported member" with stale dist → run api-spec codegen first.
+- [Frontend vitest setup](frontend-vitest.md) — agent-observability uses vitest@3 + jsdom + Testing Library; mock api hooks & @/lib/date-range; Skeleton has no data-slot (match .animate-pulse).
