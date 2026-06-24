@@ -40,6 +40,8 @@ import {
   Copy,
   Check,
   Maximize2,
+  Minimize2,
+  ZoomIn,
 } from "lucide-react";
 
 const KIND_STYLES: Record<string, string> = {
@@ -398,6 +400,7 @@ export default function TraceDetail() {
   const { params } = useDateRange();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [scale, setScale] = useState<"linear" | "log">("linear");
+  const [zoom, setZoom] = useState<{ startMs: number; endMs: number; label: string } | null>(null);
 
   const { data: trace, isLoading } = useGetTrace(traceId || "", params, {
     query: { enabled: !!traceId, queryKey: ["trace", traceId, params] },
@@ -410,41 +413,60 @@ export default function TraceDetail() {
 
   const rootName = spans.length > 0 ? spans[0].name : traceId;
 
-  // Project a millisecond offset within the trace (0..totalMs) onto a 0..100
-  // position. Log scale compresses long stretches of wall-clock time so that
-  // short spans and tightly-packed early activity stay legible when one step
-  // dominates the overall duration.
+  // The visible time window (in ms offsets from the trace start). With no zoom
+  // it spans the whole trace; zooming to a span narrows it to that span's
+  // start/end so tightly-packed sub-steps fill the available width.
+  const windowStart = zoom ? zoom.startMs : 0;
+  const windowEnd = zoom ? zoom.endMs : totalMs;
+  const windowSpan = windowEnd - windowStart;
+
+  // Project a millisecond offset within the trace onto a 0..100 position inside
+  // the current window. Log scale compresses long stretches of wall-clock time
+  // so that short spans and tightly-packed early activity stay legible when one
+  // step dominates the window's duration.
   const project = (ms: number): number => {
-    if (totalMs <= 0) return 0;
-    const clamped = Math.min(Math.max(ms, 0), totalMs);
+    if (windowSpan <= 0) return 0;
+    const clamped = Math.min(Math.max(ms, windowStart), windowEnd);
+    const rel = clamped - windowStart;
     if (scale === "log") {
-      return (Math.log1p(clamped) / Math.log1p(totalMs)) * 100;
+      return (Math.log1p(rel) / Math.log1p(windowSpan)) * 100;
     }
-    return (clamped / totalMs) * 100;
+    return (rel / windowSpan) * 100;
   };
 
   // Inverse of project(): given a 0..100 position, return the millisecond offset
   // that lands there. Used to label evenly-spaced ruler ticks so the ms values
-  // shift correctly when Log scale compresses the axis.
+  // shift correctly when Log scale compresses the axis and when zoomed into a
+  // narrower window.
   const projectInverse = (pct: number): number => {
-    if (totalMs <= 0) return 0;
+    if (windowSpan <= 0) return 0;
     const frac = Math.min(Math.max(pct, 0), 100) / 100;
     if (scale === "log") {
-      return Math.expm1(frac * Math.log1p(totalMs));
+      return windowStart + Math.expm1(frac * Math.log1p(windowSpan));
     }
-    return frac * totalMs;
+    return windowStart + frac * windowSpan;
   };
 
   // Evenly-spaced ruler ticks (0%, 25%, ... 100%). Positions stay fixed; the
-  // labels are derived through projectInverse so they adapt to Linear vs Log.
+  // labels are derived through projectInverse so they adapt to Linear vs Log
+  // and to the current zoom window.
   const rulerTicks = useMemo(
     () =>
       [0, 25, 50, 75, 100].map((pct) => ({
         pct,
         ms: projectInverse(pct),
       })),
-    [scale, totalMs],
+    [scale, windowStart, windowSpan],
   );
+
+  function zoomToSpan(span: TraceSpan) {
+    const startMs = Date.parse(span.timestamp);
+    if (totalMs <= 0 || !Number.isFinite(startMs)) return;
+    const start = Math.max(startMs - traceStartMs, 0);
+    const end = Math.min(start + span.latencyMs, totalMs);
+    if (end <= start) return;
+    setZoom({ startMs: start, endMs: end, label: span.name });
+  }
 
   function toggle(spanId: string) {
     setExpanded((prev) => {
@@ -538,6 +560,29 @@ export default function TraceDetail() {
             <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
               <CardTitle>Span timeline</CardTitle>
               <div className="flex items-center gap-2">
+                {zoom && (
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="secondary"
+                      className="max-w-[200px] gap-1 font-normal"
+                      data-testid="badge-zoom-target"
+                    >
+                      <ZoomIn className="size-3 shrink-0" />
+                      <span className="truncate">{zoom.label}</span>
+                    </Badge>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1.5"
+                      onClick={() => setZoom(null)}
+                      data-testid="button-zoom-reset"
+                    >
+                      <Minimize2 className="size-3.5" />
+                      Full trace
+                    </Button>
+                  </div>
+                )}
                 <span className="text-xs text-muted-foreground hidden sm:inline">Scale</span>
                 <ToggleGroup
                   type="single"
@@ -578,7 +623,7 @@ export default function TraceDetail() {
                         }}
                       >
                         <span className="whitespace-nowrap leading-none">
-                          {tick.pct === 0 ? "0" : `+${formatLatency(tick.ms)}`}
+                          {tick.ms <= 0 ? "0" : `+${formatLatency(tick.ms)}`}
                         </span>
                         <span className="mt-0.5 h-1.5 w-px bg-border" aria-hidden />
                       </div>
@@ -603,37 +648,68 @@ export default function TraceDetail() {
                   const isOpen = expanded.has(span.spanId);
                   const barColor =
                     span.status === "error" ? "bg-destructive" : KIND_BAR[span.kind] ?? "bg-primary";
+                  const spanEndOffset = startOffset + span.latencyMs;
+                  const inWindow =
+                    !hasOffset ||
+                    (startOffset <= windowEnd && spanEndOffset >= windowStart);
+                  const dimmed = zoom != null && !inWindow;
+                  const isZoomTarget =
+                    zoom != null &&
+                    Math.abs(startOffset - zoom.startMs) < 0.001 &&
+                    Math.abs(spanEndOffset - zoom.endMs) < 0.001;
+                  const canZoom = hasOffset && totalMs > 0;
+                  const bar = (
+                    <div className="relative h-2 rounded bg-muted">
+                      <div
+                        className={`absolute top-0 h-2 rounded ${barColor}`}
+                        style={{
+                          left: `${Math.min(Math.max(offsetPct, 0), 100)}%`,
+                          width: `${Math.min(widthPct, 100)}%`,
+                          minWidth: "3px",
+                        }}
+                      />
+                    </div>
+                  );
                   return (
-                    <div key={span.spanId} className="text-sm">
-                      <button
-                        type="button"
-                        onClick={() => toggle(span.spanId)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
-                        data-testid={`row-trace-span-${span.spanId}`}
-                      >
-                        <ChevronRight
-                          className={`size-4 text-muted-foreground shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`}
-                        />
-                        <div
-                          className="flex items-center gap-2 shrink-0 w-64 min-w-0"
-                          style={{ paddingLeft: `${depth * 16}px` }}
+                    <div
+                      key={span.spanId}
+                      className={`text-sm transition-opacity ${dimmed ? "opacity-40" : ""}`}
+                    >
+                      <div className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                        <button
+                          type="button"
+                          onClick={() => toggle(span.spanId)}
+                          className="flex items-center gap-3 shrink-0 text-left"
+                          data-testid={`row-trace-span-${span.spanId}`}
                         >
-                          <KindBadge kind={span.kind} />
-                          <span className="font-medium truncate">{span.name}</span>
-                        </div>
+                          <ChevronRight
+                            className={`size-4 text-muted-foreground shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                          />
+                          <div
+                            className="flex items-center gap-2 shrink-0 w-64 min-w-0"
+                            style={{ paddingLeft: `${depth * 16}px` }}
+                          >
+                            <KindBadge kind={span.kind} />
+                            <span className="font-medium truncate">{span.name}</span>
+                          </div>
+                        </button>
                         <div className="flex-1 min-w-[80px] hidden sm:block">
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div className="relative h-2 rounded bg-muted">
-                                <div
-                                  className={`absolute top-0 h-2 rounded ${barColor}`}
-                                  style={{
-                                    left: `${Math.min(Math.max(offsetPct, 0), 100)}%`,
-                                    width: `${Math.min(widthPct, 100)}%`,
-                                    minWidth: "3px",
-                                  }}
-                                />
-                              </div>
+                              {canZoom ? (
+                                <button
+                                  type="button"
+                                  onClick={() => zoomToSpan(span)}
+                                  className={`group/bar block w-full cursor-zoom-in rounded transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isZoomTarget ? "ring-2 ring-ring" : ""}`}
+                                  title={`Zoom to "${span.name}"`}
+                                  aria-label={`Zoom timeline to ${span.name}`}
+                                  data-testid={`button-zoom-span-${span.spanId}`}
+                                >
+                                  {bar}
+                                </button>
+                              ) : (
+                                bar
+                              )}
                             </TooltipTrigger>
                             <TooltipContent
                               side="top"
@@ -665,7 +741,7 @@ export default function TraceDetail() {
                             {span.status}
                           </Badge>
                         </div>
-                      </button>
+                      </div>
                       {isOpen && (
                         <div className="px-4 pb-4 pt-1 space-y-3 bg-muted/20">
                           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
