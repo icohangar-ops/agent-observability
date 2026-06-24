@@ -905,4 +905,155 @@ describe("Traces + DateRangeProvider shared link", () => {
       JSON.parse(window.localStorage.getItem(DATE_STORAGE_KEY) ?? "{}").preset,
     ).toBe("month");
   });
+
+  it("restores a remembered preset range from storage on a fresh visit with no link", async () => {
+    // A returning visitor with no shared link: the URL carries no range params,
+    // but localStorage remembers a 30d preset from a prior visit. initialState()
+    // finds nothing in parseSearch and falls back to parseStorage, which
+    // re-derives the concrete 30d window from the stored preset.
+    const today = new Date();
+    const from30d = format(subDays(today, 29), "yyyy-MM-dd");
+    const to30d = format(today, "yyyy-MM-dd");
+    window.localStorage.setItem(
+      DATE_STORAGE_KEY,
+      JSON.stringify({ preset: "30d", from: from30d, to: to30d }),
+    );
+    // No range query params at all — a pure storage-only restore.
+    window.history.replaceState({}, "", "/traces");
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // The remembered 30d window reaches the list query even without a link.
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.from).toBe(from30d);
+      expect(params.to).toBe(to30d);
+    });
+
+    // The provider rewrites the URL to reflect the restored range so it is
+    // shareable again. The 30d preset is derived, so only range lands in the URL.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("range")).toBe("30d");
+      expect(search.get("from")).toBeNull();
+      expect(search.get("to")).toBeNull();
+    });
+
+    // Extra ticks must prove the restored range has settled (no ping-pong).
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("range")).toBe("30d");
+    const settledParams = lastListParams();
+    expect(settledParams.from).toBe(from30d);
+    expect(settledParams.to).toBe(to30d);
+  });
+
+  it("restores a remembered custom from/to range from storage on a fresh visit with no link", async () => {
+    // A returning visitor whose remembered range is a concrete custom window,
+    // opening the page with no range params in the URL. parseStorage reads the
+    // stored from/to straight back (unlike a preset, which is re-derived).
+    window.localStorage.setItem(
+      DATE_STORAGE_KEY,
+      JSON.stringify({ preset: "custom", from: CUSTOM_FROM, to: CUSTOM_TO }),
+    );
+    window.history.replaceState({}, "", "/traces");
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // The remembered custom window reaches the list query without a link.
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.from).toBe(CUSTOM_FROM);
+      expect(params.to).toBe(CUSTOM_TO);
+    });
+
+    // The URL is rewritten to range=custom plus its concrete from/to.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("range")).toBe("custom");
+      expect(search.get("from")).toBe(CUSTOM_FROM);
+      expect(search.get("to")).toBe(CUSTOM_TO);
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("range")).toBe("custom");
+    expect(settled.get("from")).toBe(CUSTOM_FROM);
+    expect(settled.get("to")).toBe(CUSTOM_TO);
+    const settledParams = lastListParams();
+    expect(settledParams.from).toBe(CUSTOM_FROM);
+    expect(settledParams.to).toBe(CUSTOM_TO);
+  });
+
+  it("ignores malformed JSON in storage and defaults to all time", async () => {
+    // Corrupted storage (not valid JSON) must not crash the provider: the
+    // try/catch in parseStorage swallows the parse error and initialState()
+    // falls back to the all-time default.
+    window.localStorage.setItem(DATE_STORAGE_KEY, "not-valid-json {{{");
+    window.history.replaceState({}, "", "/traces");
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // All-time means no date window is sent to the API.
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.from).toBeUndefined();
+      expect(params.to).toBeUndefined();
+    });
+
+    // No range/from/to are injected into the URL for the all-time default.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("range")).toBeNull();
+    expect(settled.get("from")).toBeNull();
+    expect(settled.get("to")).toBeNull();
+    const settledParams = lastListParams();
+    expect(settledParams.from).toBeUndefined();
+    expect(settledParams.to).toBeUndefined();
+  });
+
+  it("ignores an unknown preset in storage and defaults to all time", async () => {
+    // Well-formed JSON but a preset the app no longer recognizes (e.g. a value
+    // from an older build). isPreset() rejects it, the custom branch needs a
+    // from/to it lacks, so parseStorage returns null and the provider defaults
+    // to all time rather than honoring the stale preset.
+    window.localStorage.setItem(
+      DATE_STORAGE_KEY,
+      JSON.stringify({ preset: "quarter" }),
+    );
+    window.history.replaceState({}, "", "/traces");
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    await waitFor(() => {
+      const params = lastListParams();
+      expect(params.from).toBeUndefined();
+      expect(params.to).toBeUndefined();
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("range")).toBeNull();
+    expect(settled.get("from")).toBeNull();
+    expect(settled.get("to")).toBeNull();
+    const settledParams = lastListParams();
+    expect(settledParams.from).toBeUndefined();
+    expect(settledParams.to).toBeUndefined();
+  });
 });
