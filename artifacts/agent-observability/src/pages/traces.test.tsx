@@ -256,6 +256,39 @@ describe("Traces page breakdown click-to-filter", () => {
     );
   });
 
+  it("falls back to the default view when localStorage.getItem throws", () => {
+    // Safari private mode and locked-down enterprise profiles throw a
+    // SecurityError on the getItem call itself, *before* any value is returned.
+    // readStoredView() wraps the read in try/catch, so initialView() must fall
+    // back to the defaults rather than crashing the page. This mirrors the
+    // DateRangeProvider read-throw test for the traces-view storage key.
+    // jsdom's localStorage delegates getItem to Storage.prototype, so the spy
+    // must target the prototype (an instance spy is never hit).
+    window.history.replaceState({}, "", "/traces");
+    const getItemSpy = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new DOMException("storage is disabled", "SecurityError");
+      });
+
+    try {
+      render(<Traces />);
+
+      // Prove the read was actually attempted (and thus actually threw).
+      expect(getItemSpy).toHaveBeenCalled();
+
+      // The page mounts on its default view: no remembered group filter is
+      // applied and the list query carries none of the group dimensions.
+      expect(screen.queryByTestId("active-group-filter")).not.toBeInTheDocument();
+      const params = lastListParams();
+      expect(params.model).toBeUndefined();
+      expect(params.app).toBeUndefined();
+      expect(params.department).toBeUndefined();
+    } finally {
+      getItemSpy.mockRestore();
+    }
+  });
+
   it("restores an active group filter from a cold shared URL (no localStorage)", () => {
     // Simulate opening a shared link in a fresh tab: the query string is present
     // at mount and there is no remembered view in localStorage.
