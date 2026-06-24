@@ -57,7 +57,7 @@ function applyFilters(
   return out;
 }
 
-interface CostGroup {
+export interface CostGroup {
   key: string;
   cost: number;
   spanCount: number;
@@ -68,7 +68,7 @@ interface CostGroup {
 // Group spans by an arbitrary key (model or ml_app), summing the Datadog
 // estimated cost and tokens, sorted by cost descending. `costShare` is each
 // group's fraction of the total estimated cost across all spans (0-1).
-function groupByCost(
+export function groupByCost(
   spans: NormalizedSpan[],
   keyOf: (s: NormalizedSpan) => string,
 ): CostGroup[] {
@@ -168,7 +168,7 @@ function buildCanonicalDepartments(
 // variants collapse onto the canonical/directory label. Spans with neither a tag
 // nor a mapped ml_app are bucketed under "(unattributed)" so they remain visible
 // rather than silently dropped.
-function departmentOf(
+export function departmentOf(
   span: NormalizedSpan,
   mlAppToDept: Map<string, string>,
   canonical: Map<string, string>,
