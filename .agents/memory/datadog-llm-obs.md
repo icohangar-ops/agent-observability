@@ -38,9 +38,23 @@ Headers: **`DD-API-KEY` only** (no app key). Success = **HTTP 202**.
   and `meta.output={messages:[...]}`. Using `{value:"..."}` for an llm span 400s
   with `llm spans can only have IO Messages, not value`. Non-llm kinds (agent,
   workflow, tool, task) DO use `{value:"..."}`.
+- **Datadog lowercases tag VALUES** on ingest: a `department:Finance` tag comes
+  back as `department:finance`. The breakdown's `departmentOf` checks tags BEFORE
+  the ml_app→DB mapping, so a department tag wins and yields ugly lowercase
+  names. For demo attribution, set each span batch's `ml_app` to a **real agent
+  id** (from `scripts/data/directory.json`) and add NO department tag — the
+  breakdown resolves the proper-cased department name from the DB (agents →
+  employees → departments). One ingestion POST per ml_app (ml_app + tags are
+  batch-level, not per-span).
+- `metrics.estimated_total_cost` must be set (in **micro-dollars**) on cost-
+  bearing spans or the breakdown bars are all $0. Seed computes it from tokens ×
+  a per-model rate table.
+- Datadog can't delete ingested spans; mistakes (e.g. a wrong/lowercase tag
+  during testing) linger until they age out of the query window (~30d).
 
 **Why this matters:** the seed script (`scripts/src/seed-datadog-traces.ts`,
 `pnpm --filter @workspace/scripts run seed:traces`) is the ONLY place AgentOps
-writes to Datadog, and only sends clearly-labeled samples (ml_app
-"agentops-samples", tag sample:true). The live dashboard path is read-only.
-Ingested spans take ~30s to become searchable via the Export API.
+writes to Datadog, and only sends clearly-labeled samples (tag sample:true,
+env:demo), one batch per real agent id as ml_app so the department breakdown is
+populated. The live dashboard path is read-only. Ingested spans take ~30s to
+become searchable via the Export API.
