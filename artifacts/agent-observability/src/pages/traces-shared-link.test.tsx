@@ -997,6 +997,77 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(lastListParams().model).toBe("gpt-4o");
   });
 
+  it("widens the breakdown query again so every card reappears when toggling drill-in back to navigate mid-session", async () => {
+    // The cold-load tests above prove each mode's steady state in isolation; this
+    // one proves the *transition*. A user lands in drill-in with an active group,
+    // so the breakdown is narrowed to that group (only its row's sub-breakdown
+    // shows). Toggling back to the default "navigate" mode must widen the
+    // breakdown query again — dropping the group dimension so every card
+    // reappears — while the list/summary stay scoped to the active group. A
+    // regression here would strand the user on a narrowed breakdown after they
+    // explicitly asked to "show all groups".
+    window.localStorage.clear();
+    window.history.replaceState(
+      {},
+      "",
+      "/traces?bmode=drillin&group=model&gval=gpt-4o",
+    );
+
+    render(
+      <DateRangeProvider>
+        <NavControls />
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // Start pressed on drill-in purely from the URL's bmode param.
+    const drillin = await screen.findByTestId("breakdown-mode-drillin");
+    expect(drillin).toHaveAttribute("aria-pressed", "true");
+
+    // In drill-in the breakdown query is narrowed to the active group...
+    await waitFor(() => {
+      expect(lastBreakdownParams().model).toBe("gpt-4o");
+    });
+    // ...while the list query is also scoped to it.
+    expect(lastListParams().model).toBe("gpt-4o");
+
+    // Toggle back to the default "show all groups" mode mid-session.
+    fireEvent.click(screen.getByTestId("breakdown-mode-navigate"));
+    expect(screen.getByTestId("breakdown-mode-navigate")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("breakdown-mode-drillin")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+
+    // The behavioral proof: the breakdown query widens again (drops the group
+    // dimension) so every card reappears, while the list stays narrowed.
+    await waitFor(() => {
+      expect(lastBreakdownParams().model).toBeUndefined();
+    });
+    expect(lastListParams().model).toBe("gpt-4o");
+
+    // The default mode writes no bmode param, so switching back drops it from the
+    // URL while the active group filter remains.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("bmode")).toBeNull();
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+
+    // Extra ticks prove the widened breakdown has truly settled rather than
+    // snapping back to a narrowed query a tick later.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(lastBreakdownParams().model).toBeUndefined();
+    expect(lastListParams().model).toBe("gpt-4o");
+    expect(
+      new URLSearchParams(window.location.search).get("bmode"),
+    ).toBeNull();
+  });
+
   it("re-applies the kind, search, and sort choices to a clean path after page-to-page navigation", async () => {
     // Mid-session on an all-time page so there is no date range to also
     // re-apply, isolating the kind/search/sort slice of the *same* URL-sync
