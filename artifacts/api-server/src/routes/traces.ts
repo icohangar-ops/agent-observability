@@ -114,17 +114,36 @@ export function groupByCost(
 const DEPT_MAP_TTL_MS = 60_000;
 let deptMapCache: { map: Map<string, string>; expires: number } | null = null;
 
+// Drop the cached department map so the next loadDepartmentMap() hits the DB
+// again. Exported for tests that need a clean cache between cases; not used by
+// the running route (the TTL handles refreshing in production).
+export function resetDepartmentMapCache(): void {
+  deptMapCache = null;
+}
+
+// Minimal structural type for a Postgres query executor. Lets callers inject a
+// transaction-scoped client (e.g. in tests) in place of the shared pool while
+// keeping the exact same SQL.
+type SqlExecutor = {
+  query: <T = Record<string, unknown>>(
+    text: string,
+    params?: unknown[],
+  ) => Promise<{ rows: T[] }>;
+};
+
 // Build a map from agent id (the value carried in a span's ml_app) to its owning
 // department name, joining agents → employees → departments. On any DB error we
 // return an empty map so department grouping degrades gracefully (everything
 // falls back to tags or "(unattributed)") instead of failing the whole route.
-async function loadDepartmentMap(): Promise<Map<string, string>> {
+export async function loadDepartmentMap(
+  exec: SqlExecutor = pool as unknown as SqlExecutor,
+): Promise<Map<string, string>> {
   if (deptMapCache && deptMapCache.expires > Date.now()) {
     return deptMapCache.map;
   }
   const map = new Map<string, string>();
   try {
-    const q = await pool.query<{ agent_id: string; dept_name: string }>(
+    const q = await exec.query<{ agent_id: string; dept_name: string }>(
       `SELECT a.id AS agent_id, d.name AS dept_name
          FROM agents a
          JOIN employees e ON e.id = a.employee_id
@@ -149,7 +168,7 @@ const DEPT_TAG_RE = /^(?:department|dept|team):(.+)$/i;
 // names are authoritative and always win; for departments that only ever appear
 // as span tags we keep the first casing seen but upgrade an all-lowercase
 // placeholder to a mixed-case variant ("finance" -> "Finance") for a nicer label.
-function buildCanonicalDepartments(
+export function buildCanonicalDepartments(
   spans: NormalizedSpan[],
   mlAppToDept: Map<string, string>,
 ): Map<string, string> {

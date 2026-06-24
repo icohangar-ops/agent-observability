@@ -17,6 +17,11 @@ returns hardcoded rows. To test the genuine SQL behavior:
   them — zero pollution.
 - Compute boundary timestamps in SQL (`date_trunc('month', now())` etc.), not JS,
   to avoid client/server timezone drift.
+- If the helper has a module-level cache (e.g. an ml_app→department TTL cache),
+  export a reset function and call it in `beforeEach`; otherwise the injected
+  client is bypassed by a map cached by a prior case. A counting `query` wrapper
+  proves "served from cache" (asserts only one DB hit); reset stands in for TTL
+  expiry to prove it re-queries.
 
 **Why:** an off-by-one in a SQL date boundary is invisible to the stubbed suite.
 **How to apply:** each test bundle is esbuild-bundled separately, so its `pool` is
