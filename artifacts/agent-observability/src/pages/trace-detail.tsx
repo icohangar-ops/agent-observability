@@ -3,6 +3,7 @@ import { Link, useParams } from "wouter";
 import { useGetTrace, type TraceSpan } from "@workspace/api-client-react";
 import { useDateRange } from "@/lib/date-range";
 import { prettyPrint } from "@/lib/json-highlight";
+import { computeDepths, projectMs, projectMsInverse } from "@/lib/timeline";
 import { formatTokens, formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -107,26 +108,6 @@ function SummaryCard({
       </CardContent>
     </Card>
   );
-}
-
-// Compute nesting depth of each span by walking parentId links. Spans whose
-// parent isn't in this trace (or that have none) are treated as roots (depth 0).
-function computeDepths(spans: TraceSpan[]): Map<string, number> {
-  const byId = new Map(spans.map((s) => [s.spanId, s]));
-  const depths = new Map<string, number>();
-  const resolve = (span: TraceSpan, seen: Set<string>): number => {
-    const cached = depths.get(span.spanId);
-    if (cached != null) return cached;
-    let depth = 0;
-    if (span.parentId && byId.has(span.parentId) && !seen.has(span.parentId)) {
-      seen.add(span.spanId);
-      depth = resolve(byId.get(span.parentId)!, seen) + 1;
-    }
-    depths.set(span.spanId, depth);
-    return depth;
-  };
-  for (const s of spans) resolve(s, new Set([s.spanId]));
-  return depths;
 }
 
 // Color-code a primitive JSON value into a themed span. Theme-aware via Tailwind
@@ -408,28 +389,15 @@ export default function TraceDetail() {
   // the current window. Log scale compresses long stretches of wall-clock time
   // so that short spans and tightly-packed early activity stay legible when one
   // step dominates the window's duration.
-  const project = (ms: number): number => {
-    if (windowSpan <= 0) return 0;
-    const clamped = Math.min(Math.max(ms, windowStart), windowEnd);
-    const rel = clamped - windowStart;
-    if (scale === "log") {
-      return (Math.log1p(rel) / Math.log1p(windowSpan)) * 100;
-    }
-    return (rel / windowSpan) * 100;
-  };
+  const project = (ms: number): number =>
+    projectMs(ms, { windowStart, windowEnd, scale });
 
   // Inverse of project(): given a 0..100 position, return the millisecond offset
   // that lands there. Used to label evenly-spaced ruler ticks so the ms values
   // shift correctly when Log scale compresses the axis and when zoomed into a
   // narrower window.
-  const projectInverse = (pct: number): number => {
-    if (windowSpan <= 0) return 0;
-    const frac = Math.min(Math.max(pct, 0), 100) / 100;
-    if (scale === "log") {
-      return windowStart + Math.expm1(frac * Math.log1p(windowSpan));
-    }
-    return windowStart + frac * windowSpan;
-  };
+  const projectInverse = (pct: number): number =>
+    projectMsInverse(pct, { windowStart, windowEnd, scale });
 
   // Evenly-spaced ruler ticks (0%, 25%, ... 100%). Positions stay fixed; the
   // labels are derived through projectInverse so they adapt to Linear vs Log
