@@ -86,6 +86,14 @@ async function getJson<T>(url: string): Promise<{ status: number; body: T }> {
   return { status: res.status, body };
 }
 
+// Floating-point safe equality for summed USD costs / shares.
+function approx(actual: number, expected: number, eps = 1e-9): void {
+  assert.ok(
+    Math.abs(actual - expected) < eps,
+    `expected ${actual} to be within ${eps} of ${expected}`,
+  );
+}
+
 function spanIds(body: TraceListResponse): string[] {
   return body.spans.map((s) => s.spanId);
 }
@@ -503,5 +511,156 @@ describe("traces routes", () => {
     await getJson<TraceDetailResponse>(`${base}/traces/777`);
     assert.equal(lastDatadogBody?.data?.attributes?.filter?.from, "now-30d");
     assert.equal(lastDatadogBody?.data?.attributes?.filter?.to, "now");
+  });
+
+  // --- GET /traces/breakdown -------------------------------------------------
+
+  // Four spans whose Datadog estimated costs (micro-dollars) sum to exactly
+  // $1.00, so each group's costShare equals its USD cost numerically. One span
+  // has neither a model nor an ml_app to exercise the "(no model)"/"(no app)"
+  // fallback keys.
+  const COST_SPANS = [
+    {
+      span_id: "a",
+      name: "gpt big",
+      span_kind: "llm",
+      model_name: "gpt-4o",
+      model_provider: "openai",
+      status: "ok",
+      ml_app: "support-bot",
+      duration: 1_000_000,
+      metrics: { input_tokens: 10, output_tokens: 5, total_tokens: 15, estimated_total_cost: 500_000 }, // $0.50
+    },
+    {
+      span_id: "b",
+      name: "gpt small",
+      span_kind: "llm",
+      model_name: "gpt-4o",
+      model_provider: "openai",
+      status: "ok",
+      ml_app: "billing-agent",
+      duration: 1_000_000,
+      metrics: { input_tokens: 10, output_tokens: 10, total_tokens: 20, estimated_total_cost: 200_000 }, // $0.20
+    },
+    {
+      span_id: "c",
+      name: "claude call",
+      span_kind: "agent",
+      model_name: "claude-3",
+      model_provider: "anthropic",
+      status: "ok",
+      ml_app: "support-bot",
+      duration: 1_000_000,
+      metrics: { input_tokens: 30, output_tokens: 10, total_tokens: 40, estimated_total_cost: 200_000 }, // $0.20
+    },
+    {
+      span_id: "d",
+      name: "bare step",
+      span_kind: "agent",
+      model_name: null,
+      model_provider: null,
+      status: "ok",
+      ml_app: null,
+      duration: 1_000_000,
+      metrics: { input_tokens: 20, output_tokens: 0, total_tokens: 20, estimated_total_cost: 100_000 }, // $0.10
+    },
+  ];
+
+  test("GET /traces/breakdown groups by model, sorted by cost descending", async () => {
+    nextDatadog = datadogSpans(COST_SPANS);
+    const { status, body } = await getJson<TraceBreakdownResponse>(`${base}/traces/breakdown`);
+    assert.equal(status, 200);
+    assert.equal(body.noData, false);
+
+    // gpt-4o (a+b = $0.70) > claude-3 ($0.20) > (no model) ($0.10).
+    assert.deepEqual(
+      body.byModel.map((g) => g.key),
+      ["gpt-4o", "claude-3", "(no model)"],
+    );
+
+    const [gpt, claude, noModel] = body.byModel;
+    approx(gpt.cost, 0.7);
+    assert.equal(gpt.spanCount, 2);
+    assert.equal(gpt.totalTokens, 35);
+    approx(gpt.costShare, 0.7);
+
+    approx(claude.cost, 0.2);
+    assert.equal(claude.spanCount, 1);
+    assert.equal(claude.totalTokens, 40);
+    approx(claude.costShare, 0.2);
+
+    // The model-less span falls back to the "(no model)" key.
+    assert.equal(noModel.key, "(no model)");
+    approx(noModel.cost, 0.1);
+    assert.equal(noModel.spanCount, 1);
+    approx(noModel.costShare, 0.1);
+  });
+
+  test("GET /traces/breakdown groups by app, sorted by cost descending", async () => {
+    nextDatadog = datadogSpans(COST_SPANS);
+    const { body } = await getJson<TraceBreakdownResponse>(`${base}/traces/breakdown`);
+
+    // support-bot (a+c = $0.70) > billing-agent ($0.20) > (no app) ($0.10).
+    assert.deepEqual(
+      body.byApp.map((g) => g.key),
+      ["support-bot", "billing-agent", "(no app)"],
+    );
+
+    const [support, billing, noApp] = body.byApp;
+    approx(support.cost, 0.7);
+    assert.equal(support.spanCount, 2);
+    assert.equal(support.totalTokens, 55);
+    approx(support.costShare, 0.7);
+
+    approx(billing.cost, 0.2);
+    assert.equal(billing.spanCount, 1);
+
+    // The app-less span falls back to the "(no app)" key.
+    assert.equal(noApp.key, "(no app)");
+    approx(noApp.cost, 0.1);
+    assert.equal(noApp.spanCount, 1);
+  });
+
+  test("GET /traces/breakdown costShare sums to ~1 across each grouping", async () => {
+    nextDatadog = datadogSpans(COST_SPANS);
+    const { body } = await getJson<TraceBreakdownResponse>(`${base}/traces/breakdown`);
+    approx(body.byModel.reduce((acc, g) => acc + g.costShare, 0), 1);
+    approx(body.byApp.reduce((acc, g) => acc + g.costShare, 0), 1);
+  });
+
+  test("GET /traces/breakdown respects kind and q filters", async () => {
+    nextDatadog = datadogSpans(COST_SPANS);
+
+    // kind=llm keeps only a + b, both gpt-4o ($0.50 + $0.20).
+    const llm = (await getJson<TraceBreakdownResponse>(`${base}/traces/breakdown?kind=llm`)).body;
+    assert.deepEqual(
+      llm.byModel.map((g) => g.key),
+      ["gpt-4o"],
+    );
+    approx(llm.byModel[0].cost, 0.7);
+    assert.equal(llm.byModel[0].spanCount, 2);
+    // With only gpt-4o left, its share is the whole pie.
+    approx(llm.byModel[0].costShare, 1);
+    assert.deepEqual(
+      llm.byApp.map((g) => g.key).sort(),
+      ["billing-agent", "support-bot"],
+    );
+
+    // q=claude keeps only span c.
+    const claude = (await getJson<TraceBreakdownResponse>(`${base}/traces/breakdown?q=claude`)).body;
+    assert.deepEqual(
+      claude.byModel.map((g) => g.key),
+      ["claude-3"],
+    );
+    approx(claude.byModel[0].cost, 0.2);
+    approx(claude.byModel[0].costShare, 1);
+  });
+
+  test("GET /traces/breakdown returns empty groups in the no-data state", async () => {
+    nextDatadog = noIndexError;
+    const { body } = await getJson<TraceBreakdownResponse>(`${base}/traces/breakdown`);
+    assert.equal(body.noData, true);
+    assert.deepEqual(body.byModel, []);
+    assert.deepEqual(body.byApp, []);
   });
 });
