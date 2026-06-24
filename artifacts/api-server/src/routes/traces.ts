@@ -170,14 +170,52 @@ function summarize(spans: NormalizedSpan[]) {
   };
 }
 
+interface GroupFilter {
+  model: string | null;
+  app: string | null;
+  department: string | null;
+}
+
+function parseGroupFilter(query: Record<string, unknown>): GroupFilter {
+  return {
+    model: singleString(query.model),
+    app: singleString(query.app),
+    department: singleString(query.department),
+  };
+}
+
+// Narrow spans to a single breakdown group (model, ml_app, or department), using
+// the exact sentinel keys the breakdown emits so a clicked card row maps 1:1 to
+// the spans behind it. Department needs the agent→department map; we only load
+// it when a department filter is actually requested. Returns the spans unchanged
+// when no group filter is set.
+async function applyGroupFilter(
+  spans: NormalizedSpan[],
+  group: GroupFilter,
+): Promise<NormalizedSpan[]> {
+  let out = spans;
+  if (group.model) {
+    out = out.filter((s) => (s.model ?? "(no model)") === group.model);
+  }
+  if (group.app) {
+    out = out.filter((s) => (s.mlApp ?? "(no app)") === group.app);
+  }
+  if (group.department) {
+    const mlAppToDept = await loadDepartmentMap();
+    out = out.filter((s) => departmentOf(s, mlAppToDept) === group.department);
+  }
+  return out;
+}
+
 router.get("/traces", async (req, res) => {
   const range = parseRange(req.query as Record<string, unknown>);
   const kind = singleString(req.query.kind);
   const query = singleString(req.query.q);
+  const group = parseGroupFilter(req.query as Record<string, unknown>);
   const bounds = datadogBounds(range);
 
   const { spans, noData } = await searchSpans({ from: bounds.from, to: bounds.to });
-  const filtered = applyFilters(spans, kind, query);
+  const filtered = await applyGroupFilter(applyFilters(spans, kind, query), group);
   res.json({ noData, spans: filtered });
 });
 
@@ -185,10 +223,11 @@ router.get("/traces/summary", async (req, res) => {
   const range = parseRange(req.query as Record<string, unknown>);
   const kind = singleString(req.query.kind);
   const query = singleString(req.query.q);
+  const group = parseGroupFilter(req.query as Record<string, unknown>);
   const bounds = datadogBounds(range);
 
   const { spans, noData } = await searchSpans({ from: bounds.from, to: bounds.to });
-  const filtered = applyFilters(spans, kind, query);
+  const filtered = await applyGroupFilter(applyFilters(spans, kind, query), group);
   res.json({ noData, ...summarize(filtered) });
 });
 

@@ -327,6 +327,9 @@ paths:
         - $ref: "#/components/parameters/ToDate"
         - $ref: "#/components/parameters/SpanKind"
         - $ref: "#/components/parameters/TraceQuery"
+        - $ref: "#/components/parameters/TraceModel"
+        - $ref: "#/components/parameters/TraceApp"
+        - $ref: "#/components/parameters/TraceDepartment"
       responses:
         "200":
           description: Matching spans (possibly empty)
@@ -372,6 +375,9 @@ paths:
         - $ref: "#/components/parameters/ToDate"
         - $ref: "#/components/parameters/SpanKind"
         - $ref: "#/components/parameters/TraceQuery"
+        - $ref: "#/components/parameters/TraceModel"
+        - $ref: "#/components/parameters/TraceApp"
+        - $ref: "#/components/parameters/TraceDepartment"
       responses:
         "200":
           description: Aggregate trace summary
@@ -443,6 +449,38 @@ components:
       description: >-
         Free-text filter matched against span name, model, provider, kind, and
         ml_app.
+      schema:
+        type: string
+    TraceModel:
+      name: model
+      in: query
+      required: false
+      description: >-
+        Restrict to spans whose model matches this exact value, as keyed by the
+        cost breakdown (e.g. "gpt-4o", or "(no model)" for spans without a
+        model). Used to drill from a model breakdown row into the span table.
+      schema:
+        type: string
+    TraceApp:
+      name: app
+      in: query
+      required: false
+      description: >-
+        Restrict to spans whose ml_app/agent matches this exact value, as keyed
+        by the cost breakdown (e.g. an agent id, or "(no app)" for spans without
+        one). Used to drill from an app breakdown row into the span table.
+      schema:
+        type: string
+    TraceDepartment:
+      name: department
+      in: query
+      required: false
+      description: >-
+        Restrict to spans whose derived department/team matches this exact
+        value, as keyed by the cost breakdown (e.g. "Engineering", or
+        "(unattributed)"). Department is derived from a department/dept/team
+        span tag, falling back to the span's ml_app owning agent's department.
+        Used to drill from a department breakdown row into the span table.
       schema:
         type: string
   schemas:

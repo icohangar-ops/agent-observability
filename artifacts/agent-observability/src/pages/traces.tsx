@@ -145,11 +145,31 @@ function isSortColumn(value: string | null | undefined): value is SortColumn {
   return value != null && (SORT_COLUMNS as string[]).includes(value);
 }
 
+type GroupDimension = "model" | "app" | "department";
+
+const GROUP_DIMENSIONS: GroupDimension[] = ["model", "app", "department"];
+
+const GROUP_LABELS: Record<GroupDimension, string> = {
+  model: "Model",
+  app: "App",
+  department: "Department",
+};
+
+function isGroupDimension(value: string | null | undefined): value is GroupDimension {
+  return value != null && (GROUP_DIMENSIONS as string[]).includes(value);
+}
+
+interface GroupFilter {
+  dimension: GroupDimension;
+  value: string;
+}
+
 interface TracesView {
   kind: string;
   search: string;
   sortColumn: SortColumn | null;
   sortDirection: SortDirection;
+  group: GroupFilter | null;
 }
 
 const VIEW_STORAGE_KEY = "agent-observability:traces-view";
@@ -180,11 +200,19 @@ function initialView(): TracesView {
   const dirRaw = url.get("dir") ?? stored.sortDirection ?? "desc";
   const sortDirection: SortDirection = dirRaw === "asc" ? "asc" : "desc";
 
+  const groupDimRaw = url.get("group") ?? stored.group?.dimension ?? null;
+  const groupValue = url.get("gval") ?? stored.group?.value ?? "";
+  const group: GroupFilter | null =
+    isGroupDimension(groupDimRaw) && groupValue !== ""
+      ? { dimension: groupDimRaw, value: groupValue }
+      : null;
+
   return {
     kind: url.get("kind") ?? stored.kind ?? ALL_KINDS,
     search: url.get("q") ?? stored.search ?? "",
     sortColumn,
     sortDirection,
+    group,
   };
 }
 
@@ -213,12 +241,18 @@ function BreakdownCard({
   accent,
   groups,
   emptyLabel,
+  dimension,
+  activeValue,
+  onSelect,
 }: {
   title: string;
   icon: typeof Activity;
   accent: string;
   groups: TraceCostGroup[];
   emptyLabel: string;
+  dimension: GroupDimension;
+  activeValue: string | null;
+  onSelect: (dimension: GroupDimension, value: string) => void;
 }) {
   const top = groups.filter((g) => g.cost > 0).slice(0, 5);
   const max = top.length > 0 ? top[0].cost : 0;
@@ -234,28 +268,41 @@ function BreakdownCard({
         {top.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">{emptyLabel}</p>
         ) : (
-          <div className="space-y-2.5">
-            {top.map((g) => (
-              <div key={g.key} className="space-y-1" data-testid={`breakdown-row-${g.key}`}>
-                <div className="flex items-baseline justify-between gap-2 text-sm">
-                  <span className="truncate font-medium" title={g.key}>
-                    {g.key}
-                  </span>
-                  <span className="font-mono whitespace-nowrap">{formatCost(g.cost)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-green-600/70"
-                      style={{ width: `${max > 0 ? Math.max((g.cost / max) * 100, 2) : 0}%` }}
-                    />
+          <div className="space-y-1">
+            {top.map((g) => {
+              const isActive = activeValue === g.key;
+              return (
+                <button
+                  type="button"
+                  key={g.key}
+                  onClick={() => onSelect(dimension, g.key)}
+                  aria-pressed={isActive}
+                  title={`Filter spans by ${GROUP_LABELS[dimension].toLowerCase()}: ${g.key}`}
+                  data-testid={`breakdown-row-${g.key}`}
+                  className={`w-full space-y-1 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    isActive ? "bg-muted ring-1 ring-primary/40" : ""
+                  }`}
+                >
+                  <div className="flex items-baseline justify-between gap-2 text-sm">
+                    <span className="truncate font-medium" title={g.key}>
+                      {g.key}
+                    </span>
+                    <span className="font-mono whitespace-nowrap">{formatCost(g.cost)}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-                    {Math.round(g.costShare * 100)}%
-                  </span>
-                </div>
-              </div>
-            ))}
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-green-600/70"
+                        style={{ width: `${max > 0 ? Math.max((g.cost / max) * 100, 2) : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+                      {Math.round(g.costShare * 100)}%
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -271,6 +318,7 @@ export default function Traces() {
   const [search, setSearch] = useState(initial.search);
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(initial.sortColumn);
   const [sortDirection, setSortDirection] = useState<SortDirection>(initial.sortDirection);
+  const [group, setGroup] = useState<GroupFilter | null>(initial.group);
 
   // Persist the current view so it survives <Link> navigation (which drops the
   // query string) and restores on the next visit even without a shared URL.
@@ -279,12 +327,12 @@ export default function Traces() {
     try {
       window.localStorage.setItem(
         VIEW_STORAGE_KEY,
-        JSON.stringify({ kind, search, sortColumn, sortDirection } satisfies TracesView),
+        JSON.stringify({ kind, search, sortColumn, sortDirection, group } satisfies TracesView),
       );
     } catch {
       // ignore storage failures (private mode, quota, etc.)
     }
-  }, [kind, search, sortColumn, sortDirection]);
+  }, [kind, search, sortColumn, sortDirection, group]);
 
   // Reflect the view in the URL so it is shareable and survives a reload. Keys
   // are set/deleted in place to preserve ordering and avoid fighting the
@@ -305,21 +353,47 @@ export default function Traces() {
       next.delete("sort");
       next.delete("dir");
     }
+    if (group) {
+      next.set("group", group.dimension);
+      next.set("gval", group.value);
+    } else {
+      next.delete("group");
+      next.delete("gval");
+    }
     const desired = next.toString();
     if (current === desired) return;
     navigate(`${location}${desired ? `?${desired}` : ""}`, { replace: true });
-  }, [kind, search, sortColumn, sortDirection, location, navigate]);
+  }, [kind, search, sortColumn, sortDirection, group, location, navigate]);
 
-  const queryParams = {
+  // Clicking a breakdown row toggles a single-group filter on the table; clicking
+  // the active row again clears it. Only one group dimension can be active at a
+  // time so the table always maps to exactly one card row.
+  function selectGroup(dimension: GroupDimension, value: string) {
+    setGroup((prev) =>
+      prev && prev.dimension === dimension && prev.value === value
+        ? null
+        : { dimension, value },
+    );
+  }
+
+  // The breakdown is the navigation aid, so it stays scoped to the date/kind/
+  // search filters only — it must keep showing every group so a user can pivot
+  // to or clear the active group. The table and summary additionally narrow to
+  // the clicked group.
+  const breakdownParams = {
     ...params,
     ...(kind !== ALL_KINDS ? { kind } : {}),
     ...(search.trim() !== "" ? { q: search.trim() } : {}),
+  };
+  const queryParams = {
+    ...breakdownParams,
+    ...(group ? { [group.dimension]: group.value } : {}),
   };
 
   const { data: traces, isLoading: isTracesLoading } = useListTraces(queryParams);
   const { data: summary, isLoading: isSummaryLoading } = useGetTraceSummary(queryParams);
   const { data: breakdown, isLoading: isBreakdownLoading } =
-    useGetTraceCostBreakdown(queryParams);
+    useGetTraceCostBreakdown(breakdownParams);
 
   const noData = traces?.noData ?? false;
   const byModel = breakdown?.byModel ?? [];
@@ -434,6 +508,9 @@ export default function Traces() {
               accent="bg-emerald-500/15 text-emerald-500"
               groups={byModel}
               emptyLabel="No model cost recorded for these spans."
+              dimension="model"
+              activeValue={group?.dimension === "model" ? group.value : null}
+              onSelect={selectGroup}
             />
             <BreakdownCard
               title="Top apps by est. cost"
@@ -441,6 +518,9 @@ export default function Traces() {
               accent="bg-violet-500/15 text-violet-500"
               groups={byApp}
               emptyLabel="No app cost recorded for these spans."
+              dimension="app"
+              activeValue={group?.dimension === "app" ? group.value : null}
+              onSelect={selectGroup}
             />
             <BreakdownCard
               title="Top departments by est. cost"
@@ -448,10 +528,14 @@ export default function Traces() {
               accent="bg-amber-500/15 text-amber-500"
               groups={byDepartment}
               emptyLabel="No department cost recorded for these spans."
+              dimension="department"
+              activeValue={group?.dimension === "department" ? group.value : null}
+              onSelect={selectGroup}
             />
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Costs are Datadog estimates, grouped over the active date range and filters.
+            Costs are Datadog estimates, grouped over the active date range and filters. Click a row
+            to filter the spans below.
           </p>
         </div>
       ) : null}
@@ -493,6 +577,25 @@ export default function Traces() {
           </Button>
         )}
       </div>
+
+      {group && (
+        <div className="flex items-center gap-2 text-sm" data-testid="active-group-filter">
+          <span className="text-muted-foreground">Filtered by</span>
+          <button
+            type="button"
+            onClick={() => setGroup(null)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 font-medium text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            data-testid="button-clear-group-filter"
+            aria-label={`Clear ${GROUP_LABELS[group.dimension].toLowerCase()} filter`}
+          >
+            <span className="text-muted-foreground">{GROUP_LABELS[group.dimension]}:</span>
+            <span className="max-w-[16rem] truncate" title={group.value}>
+              {group.value}
+            </span>
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-0">

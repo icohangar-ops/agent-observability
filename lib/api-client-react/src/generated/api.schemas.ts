@@ -397,6 +397,21 @@ export type SpanKindParameter = string;
  */
 export type TraceQueryParameter = string;
 
+/**
+ * Restrict to spans whose model matches this exact value, as keyed by the cost breakdown (e.g. "gpt-4o", or "(no model)" for spans without a model). Used to drill from a model breakdown row into the span table.
+ */
+export type TraceModelParameter = string;
+
+/**
+ * Restrict to spans whose ml_app/agent matches this exact value, as keyed by the cost breakdown (e.g. an agent id, or "(no app)" for spans without one). Used to drill from an app breakdown row into the span table.
+ */
+export type TraceAppParameter = string;
+
+/**
+ * Restrict to spans whose derived department/team matches this exact value, as keyed by the cost breakdown (e.g. "Engineering", or "(unattributed)"). Department is derived from a department/dept/team span tag, falling back to the span's ml_app owning agent's department. Used to drill from a department breakdown row into the span table.
+ */
+export type TraceDepartmentParameter = string;
+
 export type GetOverviewParams = {
 /**
  * Inclusive start of the reporting window as an ISO date (YYYY-MM-DD). When omitted, aggregation starts from the earliest usage event.
@@ -513,6 +528,18 @@ kind?: SpanKindParameter;
  * Free-text filter matched against span name, model, provider, kind, and ml_app.
  */
 q?: TraceQueryParameter;
+/**
+ * Restrict to spans whose model matches this exact value, as keyed by the cost breakdown (e.g. "gpt-4o", or "(no model)" for spans without a model). Used to drill from a model breakdown row into the span table.
+ */
+model?: TraceModelParameter;
+/**
+ * Restrict to spans whose ml_app/agent matches this exact value, as keyed by the cost breakdown (e.g. an agent id, or "(no app)" for spans without one). Used to drill from an app breakdown row into the span table.
+ */
+app?: TraceAppParameter;
+/**
+ * Restrict to spans whose derived department/team matches this exact value, as keyed by the cost breakdown (e.g. "Engineering", or "(unattributed)"). Department is derived from a department/dept/team span tag, falling back to the span's ml_app owning agent's department. Used to drill from a department breakdown row into the span table.
+ */
+department?: TraceDepartmentParameter;
 };
 
 export type GetTraceParams = {
@@ -543,6 +570,18 @@ kind?: SpanKindParameter;
  * Free-text filter matched against span name, model, provider, kind, and ml_app.
  */
 q?: TraceQueryParameter;
+/**
+ * Restrict to spans whose model matches this exact value, as keyed by the cost breakdown (e.g. "gpt-4o", or "(no model)" for spans without a model). Used to drill from a model breakdown row into the span table.
+ */
+model?: TraceModelParameter;
+/**
+ * Restrict to spans whose ml_app/agent matches this exact value, as keyed by the cost breakdown (e.g. an agent id, or "(no app)" for spans without one). Used to drill from an app breakdown row into the span table.
+ */
+app?: TraceAppParameter;
+/**
+ * Restrict to spans whose derived department/team matches this exact value, as keyed by the cost breakdown (e.g. "Engineering", or "(unattributed)"). Department is derived from a department/dept/team span tag, falling back to the span's ml_app owning agent's department. Used to drill from a department breakdown row into the span table.
+ */
+department?: TraceDepartmentParameter;
 };
 
 export type GetTraceCostBreakdownParams = {
