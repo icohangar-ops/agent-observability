@@ -56,6 +56,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ToastAction } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
 
 const ALL_KINDS = "__all__";
 
@@ -362,6 +364,7 @@ export default function Traces() {
   const [group, setGroup] = useState<GroupFilter | null>(initial.group);
   const [breakdownMode, setBreakdownMode] = useState<BreakdownMode>(initial.breakdownMode);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const { toast } = useToast();
 
   // Persist the current view so it survives <Link> navigation (which drops the
   // query string) and restores on the next visit even without a shared URL.
@@ -477,7 +480,37 @@ export default function Traces() {
 
   const hasActiveView = activeFilterCount > 0;
 
+  // Re-apply a previously captured view to every control at once, and write it
+  // straight back to localStorage so it survives <Link> navigation (the persist
+  // effect re-runs on the state change too, but writing here makes the restore
+  // atomic and robust even if a navigation fires before that effect settles).
+  function restoreView(view: TracesView) {
+    setKind(view.kind);
+    setSearch(view.search);
+    setSortColumn(view.sortColumn);
+    setSortDirection(view.sortDirection);
+    setGroup(view.group);
+    setBreakdownMode(view.breakdownMode);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(view));
+      } catch {
+        // ignore storage failures (private mode, quota, etc.)
+      }
+    }
+  }
+
   function resetView() {
+    // Snapshot the exact view before wiping it, so the Undo toast can restore
+    // the user's carefully assembled filters down to the sort direction.
+    const previous: TracesView = {
+      kind,
+      search,
+      sortColumn,
+      sortDirection,
+      group,
+      breakdownMode,
+    };
     setKind(ALL_KINDS);
     setSearch("");
     setSortColumn(null);
@@ -491,6 +524,22 @@ export default function Traces() {
         // ignore storage failures (private mode, quota, etc.)
       }
     }
+    const { dismiss } = toast({
+      title: "View reset",
+      description: "All filters cleared.",
+      action: (
+        <ToastAction
+          altText="Undo reset and restore the previous view"
+          data-testid="button-undo-reset"
+          onClick={() => {
+            restoreView(previous);
+            dismiss();
+          }}
+        >
+          Undo
+        </ToastAction>
+      ),
+    });
   }
 
   // A single trivial filter resets with no friction; clearing two or more at

@@ -24,6 +24,7 @@ vi.mock("@workspace/api-client-react", () => ({
 }));
 
 import Traces from "./traces";
+import { Toaster } from "@/components/ui/toaster";
 import { DateRangeProvider, useDateRange } from "@/lib/date-range";
 
 // A fixed custom window the tests apply via the provider's setCustomRange
@@ -1619,6 +1620,101 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(settledBd.kind).toBeUndefined();
     expect(settledBd.q).toBeUndefined();
     expect(settledBd.model).toBeUndefined();
+  });
+
+  it("offers an Undo toast after a reset that restores the exact prior view and its localStorage", async () => {
+    // After Reset wipes a carefully assembled view (task #107), a short-lived
+    // toast must offer an "Undo" that restores the *exact* prior view — span
+    // kind, search, sort + direction, the breakdown group, and the drill-in
+    // mode — and re-writes it to localStorage so it survives later navigation.
+    // A user lands via a shared URL carrying all of those, hits Reset, then
+    // Undo; every cleared filter must come back together.
+    window.localStorage.clear();
+    window.history.replaceState(
+      {},
+      "",
+      "/traces?kind=llm&q=gpt&sort=cost&dir=asc&group=model&gval=gpt-4o&bmode=drillin",
+    );
+
+    render(
+      <DateRangeProvider>
+        <Traces />
+        <Toaster />
+      </DateRangeProvider>,
+    );
+
+    // All controls start active purely from the URL: kind+q+group reach the list
+    // query (the group reaches it because bmode=drillin narrows to that group).
+    await waitFor(() => {
+      const list = lastListParams();
+      expect(list.kind).toBe("llm");
+      expect(list.q).toBe("gpt");
+      expect(list.model).toBe("gpt-4o");
+    });
+    expect(screen.getByTestId("active-group-filter")).toHaveTextContent("gpt-4o");
+
+    // Reset asks to confirm with several filters active (task #106); confirm it.
+    fireEvent.click(screen.getByTestId("button-reset-view"));
+    fireEvent.click(screen.getByTestId("button-confirm-reset"));
+
+    // The view is cleared: the list query drops kind/q/group and the URL drops
+    // every view param.
+    await waitFor(() => {
+      const list = lastListParams();
+      expect(list.kind).toBeUndefined();
+      expect(list.q).toBeUndefined();
+      expect(list.model).toBeUndefined();
+    });
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("kind")).toBeNull();
+      expect(search.get("q")).toBeNull();
+      expect(search.get("group")).toBeNull();
+    });
+    expect(screen.queryByTestId("active-group-filter")).toBeNull();
+
+    // The Undo toast appears with its action button.
+    const undo = await screen.findByTestId("button-undo-reset");
+    expect(undo).toHaveTextContent("Undo");
+
+    // Click Undo — every cleared filter comes back to the list query together.
+    fireEvent.click(undo);
+
+    await waitFor(() => {
+      const list = lastListParams();
+      expect(list.kind).toBe("llm");
+      expect(list.q).toBe("gpt");
+      expect(list.model).toBe("gpt-4o");
+    });
+
+    // The URL is rebuilt with the exact prior view, sort direction included.
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("kind")).toBe("llm");
+      expect(search.get("q")).toBe("gpt");
+      expect(search.get("sort")).toBe("cost");
+      expect(search.get("dir")).toBe("asc");
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+      expect(search.get("bmode")).toBe("drillin");
+    });
+
+    // The breakdown filter chip is back, proving the group filter is restored.
+    expect(screen.getByTestId("active-group-filter")).toHaveTextContent("gpt-4o");
+
+    // The restored view is written back to localStorage so it survives a later
+    // <Link> navigation that drops the query string.
+    await waitFor(() => {
+      const raw = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      expect(raw).not.toBeNull();
+      const stored = JSON.parse(raw ?? "{}") as Record<string, unknown>;
+      expect(stored.kind).toBe("llm");
+      expect(stored.search).toBe("gpt");
+      expect(stored.sortColumn).toBe("cost");
+      expect(stored.sortDirection).toBe("asc");
+      expect(stored.group).toEqual({ dimension: "model", value: "gpt-4o" });
+      expect(stored.breakdownMode).toBe("drillin");
+    });
   });
 
   it("re-applies the kind, search, and sort choices to a clean path after page-to-page navigation", async () => {
