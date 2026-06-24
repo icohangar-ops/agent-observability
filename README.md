@@ -96,6 +96,13 @@ automatically before it can ship:
   type-checks the web dashboard against its `tsconfig.json`, catching broken
   frontend code (bad props, missing API-client exports, type drift) before it
   reaches users.
+- `web-build` → `PORT=5173 BASE_PATH=/ pnpm --filter @workspace/agent-observability run build` —
+  runs the web dashboard's production `vite build`, catching errors that only
+  surface at build time (broken import paths, missing/renamed assets, CSS/Tailwind
+  failures, bundler issues). Because `vite build` uses esbuild and strips types
+  without type-checking, this complements rather than replaces `web-typecheck`.
+  The `PORT` and `BASE_PATH` env vars are required by `vite.config.ts`, which
+  throws at config-load time if either is missing.
 
 These are registered via the validation system (not a script in this repo); run
 the commands above directly to reproduce a check locally.
