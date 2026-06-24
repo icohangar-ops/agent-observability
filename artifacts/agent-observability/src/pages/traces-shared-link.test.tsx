@@ -1,5 +1,6 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { useLocation } from "wouter";
 import { format, startOfMonth, subDays } from "date-fns";
 import type {
   TraceList,
@@ -74,6 +75,24 @@ function PresetControls() {
         All time
       </button>
     </>
+  );
+}
+
+// A minimal stand-in for the app's sidebar/menu links: it drives wouter's
+// programmatic navigate to a fresh path with *no* query string — exactly what a
+// <Link> does when the user moves to another page. The Traces page's URL-sync
+// effect must re-apply the active breakdown filter onto that clean path, the
+// same way the date-range effect re-applies the remembered range.
+function NavControls() {
+  const [, navigate] = useLocation();
+  return (
+    <button
+      type="button"
+      data-testid="nav-overview"
+      onClick={() => navigate("/overview")}
+    >
+      Go to overview
+    </button>
   );
 }
 
@@ -640,6 +659,60 @@ describe("Traces + DateRangeProvider shared link", () => {
     expect(settledParams.model).toBe("gpt-4o");
     expect(settledParams.from).toBe(CUSTOM_FROM);
     expect(settledParams.to).toBe(CUSTOM_TO);
+  });
+
+  it("re-applies the active breakdown filter to a clean path after page-to-page navigation", async () => {
+    // Mid-session on an all-time page so the only live query param is the
+    // breakdown filter — there is no date range to also re-apply, isolating the
+    // breakdown's own location-change handling.
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/traces");
+
+    render(
+      <DateRangeProvider>
+        <NavControls />
+        <Traces />
+      </DateRangeProvider>,
+    );
+
+    // 1) Activate a breakdown filter by clicking a row.
+    fireEvent.click(screen.getByTestId("breakdown-row-gpt-4o"));
+    await waitFor(() => {
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+    // The filter reaches the list query on the original page.
+    await waitFor(() => {
+      expect(lastListParams().model).toBe("gpt-4o");
+    });
+
+    // 2) Move to another page via wouter navigation, which lands on a fresh path
+    // carrying *no* query string (exactly what a <Link> does).
+    fireEvent.click(screen.getByTestId("nav-overview"));
+
+    // The destination path is reached and starts with no query of its own, then
+    // the Traces URL-sync effect re-writes the breakdown filter back onto it.
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/overview");
+      const search = new URLSearchParams(window.location.search);
+      expect(search.get("group")).toBe("model");
+      expect(search.get("gval")).toBe("gpt-4o");
+    });
+
+    // The re-applied filter still reaches the data query after the move.
+    await waitFor(() => {
+      expect(lastListParams().model).toBe("gpt-4o");
+    });
+
+    // Extra ticks must prove the filter has truly settled on the new path rather
+    // than being dropped a tick later (the regression #85 guards against).
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(window.location.pathname).toBe("/overview");
+    const settled = new URLSearchParams(window.location.search);
+    expect(settled.get("group")).toBe("model");
+    expect(settled.get("gval")).toBe("gpt-4o");
+    expect(lastListParams().model).toBe("gpt-4o");
   });
 
   it("persists the restored range and group so they outlive the shared link", async () => {
