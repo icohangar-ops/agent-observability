@@ -61,7 +61,7 @@ function breakdownResult(
   over: Partial<QueryResult<TraceCostBreakdown>>,
 ): QueryResult<TraceCostBreakdown> {
   return {
-    data: { noData: false, byModel: [], byApp: [] },
+    data: { noData: false, byModel: [], byApp: [], byDepartment: [] },
     isLoading: false,
     ...over,
   };

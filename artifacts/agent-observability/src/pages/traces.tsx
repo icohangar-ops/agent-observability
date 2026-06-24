@@ -42,7 +42,9 @@ import {
   Cpu,
   Boxes,
   Building2,
+  X,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const ALL_KINDS = "__all__";
 
@@ -329,6 +331,23 @@ export default function Traces() {
       byApp.some((g) => g.cost > 0) ||
       byDepartment.some((g) => g.cost > 0));
 
+  const hasActiveView =
+    kind !== ALL_KINDS || search.trim() !== "" || sortColumn !== null;
+
+  function resetView() {
+    setKind(ALL_KINDS);
+    setSearch("");
+    setSortColumn(null);
+    setSortDirection("desc");
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(VIEW_STORAGE_KEY);
+      } catch {
+        // ignore storage failures (private mode, quota, etc.)
+      }
+    }
+  }
+
   function toggleSort(column: SortColumn) {
     if (sortColumn === column) {
       setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
@@ -461,6 +480,18 @@ export default function Traces() {
             ))}
           </SelectContent>
         </Select>
+        {hasActiveView && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={resetView}
+            className="w-full sm:w-auto text-muted-foreground"
+            data-testid="button-reset-view"
+          >
+            <X className="size-4" />
+            Reset
+          </Button>
+        )}
       </div>
 
       <Card>
