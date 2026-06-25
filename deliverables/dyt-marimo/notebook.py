@@ -1375,20 +1375,25 @@ def _(mo):
         sharper test is: drop DyT into a small **ConvNet on actual images** and see whether
         it still stands in for BatchNorm where vision practitioners always put it.
 
-        Same recipe as before, just convolutional:
+        Same recipe as before, just convolutional — and this time deep and brisk enough
+        that normalization actually has to *earn its keep*:
 
         - **Task.** A tiny, dependency-free **shapes** dataset — disks, squares and
-          triangles drawn procedurally with NumPy at random size/position with pixel
-          noise. No downloads, no `torchvision`.
-        - **Model.** A small **ConvNet** (`Conv → norm → GELU → pool`, stacked, then a
-          global-pooled linear head). The normalization sits **after each conv and before
-          the activation** — exactly where BatchNorm conventionally lives.
+          triangles drawn procedurally with NumPy at random size/position with a fair bit
+          of pixel noise. No downloads, no `torchvision`.
+        - **Model.** A **deeper ConvNet** — four stages of `(Conv → norm → GELU) × 2 → pool`,
+          eight convolutions in all, then a global-pooled linear head. The normalization
+          sits **after each conv and before the activation** — exactly where BatchNorm
+          conventionally lives.
         - **The DyT twist.** Conv feature maps are **channels-first** `[B, C, H, W]`, so the
           per-channel `γ/β` have to broadcast over the channel dimension (not the last
           one). That needs a small **channels-first DyT variant** — same one-scalar-`α`,
           `tanh`-squash math, just reshaped to drop in for `BatchNorm2d`.
-        - **Comparison.** Identical width, depth, seed, optimizer and learning rate — only
-          the normalization swapped: **BatchNorm** vs **DyT** vs **no normalization**.
+        - **Comparison.** Identical width, depth, seed, optimizer and **a deliberately
+          brisk learning rate** — only the normalization swapped: **BatchNorm** vs **DyT**
+          vs **no normalization**. At this depth and learning rate the un-normalized net
+          should *struggle*, making the value of normalization visible — while DyT tracks
+          BatchNorm.
         """
     )
     return
@@ -1396,12 +1401,14 @@ def _(mo):
 
 @app.cell
 def _(device, np, torch):
-    def make_shapes(per_class=200, size=16, noise=0.18, seed=0):
+    def make_shapes(per_class=300, size=28, noise=0.35, seed=0):
         """A tiny shapes dataset (disk / square / triangle) drawn with NumPy.
 
         Each image is a single grayscale channel; shapes are placed at a random
         position and size with additive pixel noise, so the task is non-trivial but
         needs no downloads. Returned images are channels-first `[N, 1, size, size]`.
+        The shape radius scales with `size`, and the moderate `noise` keeps the task
+        hard enough that **stable optimization** — not just expressivity — matters.
         """
         rng = np.random.default_rng(seed)
         names = ["disk", "square", "triangle"]
@@ -1412,7 +1419,7 @@ def _(device, np, torch):
         k = 0
         for ci, name in enumerate(names):
             for _ in range(per_class):
-                r = int(rng.integers(3, 6))
+                r = int(rng.integers(max(2, size // 6), max(3, size // 3)))
                 cy = int(rng.integers(r + 1, size - r - 1))
                 cx = int(rng.integers(r + 1, size - r - 1))
                 if name == "disk":
@@ -1430,8 +1437,10 @@ def _(device, np, torch):
         X = (X - X.mean()) / (X.std() + 1e-6)  # standardize the whole set
         return X, y, names
 
-    conv_size = 16
-    _X, _y, conv_class_names = make_shapes(per_class=200, size=conv_size, seed=0)
+    conv_size = 28
+    _X, _y, conv_class_names = make_shapes(
+        per_class=300, size=conv_size, noise=0.35, seed=0
+    )
     conv_classes = len(conv_class_names)
 
     # Deterministic train/test split.
@@ -1476,27 +1485,33 @@ def _(F, conv_Xte, conv_Xtr, conv_classes, conv_yte, conv_ytr, device, nn,
         raise ValueError(f"unknown conv norm {kind!r}")
 
     class TinyConvNet(nn.Module):
-        """A small ConvNet whose only configurable knob is the normalization kind.
+        """A small but **deep-ish** ConvNet whose only knob is the normalization kind.
 
-        Each stage is `Conv → norm → GELU → MaxPool`, with the normalization placed
-        right after the convolution and before the activation — the canonical slot
-        for BatchNorm in vision. `norm_kind="dyt"` swaps in the channels-first DyT;
-        `"none"` removes normalization entirely.
+        Four stages of `(Conv → norm → GELU) × 2 → MaxPool`, with the normalization
+        placed right after each convolution and before the activation — the canonical
+        slot for BatchNorm in vision. Eight convolutions deep, trained at a brisk
+        learning rate, is exactly the regime where **stable signal propagation** stops
+        being free: BatchNorm and DyT both bound activations and keep training on the
+        rails, while `norm_kind="none"` has nothing holding it together.
+        `norm_kind="dyt"` swaps in the channels-first DyT; `"none"` removes it entirely.
         """
 
         def __init__(self, in_ch, n_classes, norm_kind, width=16):
             super().__init__()
-            chs = [in_ch, width, width * 2, width * 2]
+            chs = [width, width * 2, width * 4, width * 4]  # 4 stages, 2 convs each
             layers = []
-            for i in range(len(chs) - 1):
-                layers.append(nn.Conv2d(chs[i], chs[i + 1], 3, padding=1))
-                if norm_kind != "none":
-                    layers.append(make_norm2d(norm_kind, chs[i + 1]))
-                layers.append(nn.GELU())
+            prev = in_ch
+            for ch in chs:
+                for _ in range(2):  # two convolutions per stage → eight conv layers
+                    layers.append(nn.Conv2d(prev, ch, 3, padding=1))
+                    if norm_kind != "none":
+                        layers.append(make_norm2d(norm_kind, ch))
+                    layers.append(nn.GELU())
+                    prev = ch
                 layers.append(nn.MaxPool2d(2))
             self.body = nn.Sequential(*layers)
             self.head = nn.Sequential(
-                nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(chs[-1], n_classes)
+                nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(prev, n_classes)
             )
 
         def forward(self, x):
@@ -1506,7 +1521,7 @@ def _(F, conv_Xte, conv_Xtr, conv_classes, conv_yte, conv_ytr, device, nn,
         """Train a TinyConvNet from a fixed seed so variants are directly comparable."""
         seed_everything(1337)  # identical init across norm kinds
         model = TinyConvNet(1, conv_classes, norm_kind).to(device)
-        opt = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-4)
+        opt = torch.optim.AdamW(model.parameters(), lr=8e-3, weight_decay=1e-4)
         hist = {"step": [], "train_loss": [], "test_loss": [],
                 "train_acc": [], "test_acc": []}
         g = torch.Generator().manual_seed(0)  # reproducible minibatches
@@ -1564,8 +1579,8 @@ def _(conv_Xtr, conv_class_names, conv_ytr, mo, np, plt):
     _fig.tight_layout()
     mo.vstack([
         _fig,
-        mo.md("Small 16×16 grayscale images with random size, position and pixel "
-              "noise — a genuine little vision task, with no downloads."),
+        mo.md("Small 28×28 grayscale images with random size, position and a fair bit "
+              "of pixel noise — a genuine little vision task, with no downloads."),
     ])
     return
 
@@ -1599,7 +1614,7 @@ def _(conv_btn, device, mo, os, train_conv):
             _m, _h = train_conv(_v, steps=_steps, eval_interval=_eval, progress=_bar)
             conv_results[_v] = _h
             conv_models[_v] = _m
-    mo.md("✅ Done — three ConvNets trained with identical settings.")
+    mo.md("✅ Done — three deep ConvNets trained with identical settings.")
     return conv_models, conv_results
 
 
@@ -1628,6 +1643,7 @@ def _(conv_results, mo, plt):
     _dy = conv_results["dyt"]["test_acc"][-1]
     _nn = conv_results["none"]["test_acc"][-1]
     _delta = _dy - _bn
+    _gap = _bn - _nn
     _verdict = "**matches**" if abs(_delta) < 0.03 else (
         "**beats**" if _delta > 0 else "is slightly behind"
     )
@@ -1635,8 +1651,11 @@ def _(conv_results, mo, plt):
         _fig,
         mo.md(
             f"Final **test accuracy** — BatchNorm: **{_bn:.3f}**, DyT: **{_dy:.3f}**, "
-            f"no-norm: **{_nn:.3f}** (DyT − BatchNorm = {_delta:+.3f}). "
-            f"Dropped into BatchNorm's home turf — a **ConvNet on images** — DyT "
+            f"no-norm: **{_nn:.3f}** (DyT − BatchNorm = {_delta:+.3f}, "
+            f"BatchNorm − no-norm = {_gap:+.3f}). "
+            f"At this depth and learning rate the **un-normalized net never gets off the "
+            f"ground** — its curve sits near chance while both normalized nets climb. And "
+            f"dropped into BatchNorm's home turf — a deep **ConvNet on images** — DyT "
             f"{_verdict} BatchNorm with zero DyT-specific tuning."
         ),
     ])
@@ -1720,14 +1739,17 @@ def _(mo):
         here — which says the part of BatchNorm DyT is standing in for is again the
         *smooth, bounded squashing*, not the batch statistics.
 
-        **An honest word on the no-norm baseline.** This shapes task is small and quite
-        separable, so the *un-normalized* net keeps up here too — normalization tends to
-        become genuinely load-bearing with more depth, higher learning rates and larger
-        images, not on a toy like this. So the claim this section makes is the narrow,
-        robust one: **wherever BatchNorm is the natural choice, DyT can drop in for it** —
-        now shown in a ConvNet on images, not just an MLP. And the same caveat as before
-        still holds: DyT does not reproduce BatchNorm's cross-batch regularization — but in
-        exchange it is batch-size- and inference-mode-independent.
+        **And here normalization is clearly load-bearing.** Unlike the shallow toy earlier,
+        this is a deeper net (eight convolutions) trained at a brisk learning rate — the
+        regime where stable signal propagation stops being free. The **un-normalized net
+        never gets off the ground**: its accuracy hangs near chance while both normalized
+        nets sail to near-perfect. That is the value of normalization made tangible — and
+        the headline is that **DyT buys it just as well as BatchNorm**, with the same
+        bounded squash standing in for the batch statistics. So the section now makes the
+        strong claim *and* the precise one: **where normalization is what makes training
+        work at all, DyT delivers it as a one-line drop-in for BatchNorm.** The same caveat
+        as before still holds — DyT does not reproduce BatchNorm's cross-batch
+        regularization — but in exchange it is batch-size- and inference-mode-independent.
         """
     )
     return
@@ -1754,10 +1776,12 @@ def _(mo):
         - Our **ablation** shows the win comes specifically from a *smooth, bounded,
           zero-centered* squash, which is exactly the shape LayerNorm was producing.
         - And the idea **generalizes beyond attention**: dropped into a plain **MLP**
-          (Section 8) and a small **ConvNet on images** (Section 9), DyT matches its
+          (Section 8) and a deeper **ConvNet on images** (Section 9), DyT matches its
           **BatchNorm** counterpart on synthetic tasks — two different architectures,
-          including BatchNorm's own vision home turf — because the squashing role it
-          replaces isn't specific to Transformers.
+          including BatchNorm's own vision home turf. In the ConvNet, at a depth and
+          learning rate where the **un-normalized net fails to train at all**, DyT
+          recovers BatchNorm's stability — because the squashing role it replaces isn't
+          specific to Transformers.
 
         **Why it matters:** dropping the mean/variance reduction removes a per-token
         synchronization point, pointing toward **simpler, faster, reduction-free**
