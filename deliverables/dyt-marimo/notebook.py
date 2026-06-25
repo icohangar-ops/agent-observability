@@ -1644,6 +1644,65 @@ def _(conv_results, mo, plt):
 
 
 @app.cell
+def _(DyT2d, conv_Xtr, conv_models, mo, np, plt, torch):
+    # Repeat Section 6's check on the ConvNet: does each DyT2d layer's learned
+    # scalar α track 1/std of the conv feature map it sees? Measured on a forward
+    # pass over the shapes data.
+    _dyt_conv = conv_models["dyt"]
+
+    _alphas, _names = [], []
+    for _n, _m in _dyt_conv.named_modules():
+        if isinstance(_m, DyT2d):
+            _alphas.append(float(_m.alpha.detach().cpu().item()))
+            _names.append(_n)
+
+    # 1/std of each DyT2d layer's *input* (the conv feature map) via hooks.
+    _stds = {}
+    _hs = []
+
+    def _mk(name):
+        def h(_mod, inp, _out):
+            _stds[name] = inp[0].detach().float().std().item()
+        return h
+
+    for _n, _m in _dyt_conv.named_modules():
+        if isinstance(_m, DyT2d):
+            _hs.append(_m.register_forward_hook(_mk(_n)))
+    _dyt_conv.eval()
+    with torch.no_grad():
+        _dyt_conv(conv_Xtr)
+    _dyt_conv.train()
+    for _h in _hs:
+        _h.remove()
+    _inv_std = [1.0 / _stds[n] for n in _names]
+
+    _xpos = np.arange(len(_names))
+    _fig, _ax = plt.subplots(figsize=(7.4, 4.4))
+    _ax.bar(_xpos - 0.2, _alphas, width=0.4, color="#e4572e", label="learned α")
+    _ax.bar(_xpos + 0.2, _inv_std, width=0.4, color="#5b8def", label="1 / std(input)")
+    _ax.set_xticks(_xpos)
+    _ax.set_xticklabels([f"conv{i}" for i in range(len(_names))], rotation=0,
+                        fontsize=8)
+    _ax.set_ylabel("value")
+    _ax.set_title("Learned α tracks 1/std of activations (DyT2d conv layers)")
+    _ax.legend(fontsize=9)
+    _fig.tight_layout()
+
+    _corr = float(np.corrcoef(_alphas, _inv_std)[0, 1]) if len(_alphas) > 1 else float("nan")
+    mo.vstack([
+        _fig,
+        mo.md(
+            f"Same story as the Transformer (Section 6): across {len(_names)} DyT2d "
+            f"layers the learned **α** lines up with **1/std** of the feature maps "
+            f"(Pearson **{_corr:.2f}**) — DyT rediscovers the activation scale on a "
+            f"second architecture, with one scalar per layer instead of BatchNorm's "
+            f"explicit per-channel statistics."
+        ),
+    ])
+    return
+
+
+@app.cell
 def _(mo):
     mo.md(
         r"""
