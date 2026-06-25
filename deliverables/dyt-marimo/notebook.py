@@ -1447,15 +1447,35 @@ def _(device, mlp_noise, mlp_nclasses, mo, os, plt, sweep_btn, train_mlp):
 
     _gap_dyt = sweep_acc["dyt"][-1] - sweep_acc["none"][-1]
     _gap_bn = sweep_acc["batchnorm"][-1] - sweep_acc["none"][-1]
+    # On a gentle task (low noise / few classes) the un-normalized net can keep
+    # pace even at the deepest point, so soften the "widening gap" claim when both
+    # gaps at the deepest depth are small.
+    _max_gap = max(_gap_dyt, _gap_bn)
+    if _max_gap < 0.03:
+        _verdict = (
+            "On this gentle setting the un-normalized net keeps pace even at the "
+            "deepest point — turn up `mlp_noise` or add classes to make "
+            "normalization earn its keep and open the gap the paper predicts."
+        )
+    elif _max_gap < 0.08:
+        _verdict = (
+            "The normalized variants stay together and edge ahead of the "
+            "un-normalized net as the network deepens — a modest version of the "
+            "widening gap the paper predicts (crank the sliders to widen it)."
+        )
+    else:
+        _verdict = (
+            "The normalized variants stay together and pull clearly ahead of the "
+            "un-normalized net as the network deepens — exactly the widening gap "
+            "the paper predicts."
+        )
     mo.vstack([
         _fig,
         mo.md(
             f"At the deepest point (depth **{_depths[-1]}**, "
             f"**{mlp_nclasses.value}** classes, noise **{mlp_noise.value:.2f}**): "
             f"DyT − no-norm = **{_gap_dyt:+.3f}**, BatchNorm − no-norm = "
-            f"**{_gap_bn:+.3f}**. The normalized variants stay together and pull "
-            f"ahead of the un-normalized net as the network deepens — exactly the "
-            f"widening gap the paper predicts."
+            f"**{_gap_bn:+.3f}**. {_verdict}"
         ),
     ])
     return (sweep_acc,)
