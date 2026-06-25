@@ -9,3 +9,4 @@
 - [api-client dist staleness](api-client-codegen-staleness.md) — artifact tsc reads client dist (not src); "no exported member" with stale dist → run api-spec codegen first.
 - [Frontend vitest setup](frontend-vitest.md) — agent-observability uses vitest@3 + jsdom + Testing Library; mock api hooks & @/lib/date-range; Skeleton has no data-slot (match .animate-pulse).
 - [Real-SQL tests against Postgres](real-sql-tests.md) — observability suite stubs pool.query; to test actual SQL (e.g. date windows), inject a tx client + TEMP tables in BEGIN/ROLLBACK.
+- [marimo notebooks](marimo-notebooks.md) — standalone py deliverables; run as script to validate end-to-end; gate heavy compute with run_button+mo.stop and an AUTORUN env escape hatch; CPU-only container.
