@@ -1254,16 +1254,31 @@ def _(device, mlp_btn, mlp_depth, mlp_nclasses, mlp_noise, mo, os, train_mlp):
                                depth=_depth, progress=_bar)
             mlp_results[_v] = _h
             mlp_models[_v] = _m
+    # Snapshot the slider settings these models were trained with, so the result
+    # and decision-boundary cells below can detect when the sliders have moved
+    # and avoid drawing stale models over a freshly-regenerated dataset.
+    mlp_trained_settings = (_depth, mlp_nclasses.value, round(mlp_noise.value, 3))
     mo.md(
         f"✅ Done — three MLPs trained with identical settings "
         f"(depth **{_depth}**, **{mlp_nclasses.value}** classes, "
         f"noise **{mlp_noise.value:.2f}**)."
     )
-    return mlp_models, mlp_results
+    return mlp_models, mlp_results, mlp_trained_settings
 
 
 @app.cell
-def _(mlp_results, mo, plt):
+def _(mlp_depth, mlp_nclasses, mlp_noise, mlp_results, mlp_trained_settings, mo,
+      plt):
+    # Guard: if the sliders moved since the last run, these curves describe the
+    # *old* dataset. Hide them behind a prompt rather than show a stale plot.
+    mo.stop(
+        (mlp_depth.value, mlp_nclasses.value, round(mlp_noise.value, 3))
+        != mlp_trained_settings,
+        mo.md(
+            "⚠️ **Settings changed since the last run** — click **▶ Train MLP** "
+            "above to re-train and refresh these curves."
+        ),
+    )
     _labels = {"batchnorm": "BatchNorm", "dyt": "DyT", "none": "no norm"}
     _colors = {"batchnorm": "#2b2d42", "dyt": "#e4572e", "none": "#8d99ae"}
 
@@ -1303,7 +1318,19 @@ def _(mlp_results, mo, plt):
 
 
 @app.cell
-def _(mlp_models, mlp_Xtr, mlp_ytr, mo, np, plt, torch):
+def _(mlp_depth, mlp_models, mlp_nclasses, mlp_noise, mlp_trained_settings,
+      mlp_Xtr, mlp_ytr, mo, np, plt, torch):
+    # Guard: the dataset (mlp_Xtr / mlp_ytr) regenerates live as the sliders move,
+    # but mlp_models only retrains on a button click. Without this check the old
+    # models would be drawn over a freshly-regenerated dataset, which looks wrong.
+    mo.stop(
+        (mlp_depth.value, mlp_nclasses.value, round(mlp_noise.value, 3))
+        != mlp_trained_settings,
+        mo.md(
+            "⚠️ **Settings changed since the last run** — click **▶ Train MLP** "
+            "above to re-train and refresh these decision boundaries."
+        ),
+    )
     # Decision boundaries: BatchNorm vs DyT learn essentially the same function.
     _Xc = mlp_Xtr.cpu().numpy()
     _yc = mlp_ytr.cpu().numpy()
