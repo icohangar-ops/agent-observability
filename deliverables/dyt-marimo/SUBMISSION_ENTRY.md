@@ -9,15 +9,15 @@ by you — see "Remaining steps".
 
 | # | Form field | Value to enter |
 |---|---|---|
-| 1 | Full Name — First | **Shyam** *(confirm)* |
-|   | Full Name — Last | **Desigan** *(confirm)* |
-| 2 | Are you submitting as a team? | **No** *(assumes solo — confirm)* |
+| 1 | Full Name — First | **Shyam** |
+|   | Full Name — Last | **Desigan** |
+| 2 | Are you submitting as a team? | **No** |
 | 3 | Team Member Names | *leave blank (solo)* |
-| 4 | Email Address | **icohangar@gmail.com** *(confirm)* |
+| 4 | Email Address | **sam@cubiczan.com** |
 | 5 | Team Member Emails | *leave blank (solo)* |
 | 6 | molab Link | ⛔ **NEEDED** — publish the notebook to molab, paste the public link |
 | 7 | FULL title of the alphaXiv paper | **Transformers without Normalization** |
-| 8 | Video explanation (file upload) | ⛔ **NEEDED** — record the ~3-min walkthrough, upload the file |
+| 8 | Video explanation (file upload, **< 5 min total**) | ⛔ **NEEDED** — record the ~3-min walkthrough, upload the file |
 
 ## Remaining steps (only you can do these)
 
@@ -25,9 +25,10 @@ by you — see "Remaining steps".
    `notebook.py`, add deps (`marimo`, `torch`, `numpy`, `matplotlib`), select a GPU
    runtime, run top-to-bottom (Train baseline → Train DyT → Run ablation), then
    Publish/share and copy the public link. Verify it opens in an incognito window.
-2. **Video** — record the ~3-min screen walkthrough using the script in
-   `SUBMISSION.md` §A. The form takes a **file upload** (not a URL), so have the
-   video file ready (mp4) before opening the form.
+2. **Video** — record the screen walkthrough using the script in `SUBMISSION.md`
+   §A. Must be **under 5 minutes total** (our script is ~3 min). The form takes a
+   **file upload** (not a URL), so have the video file ready (mp4) before opening
+   the form.
 
 ## Notes
 - Field 7 wants the *full* title; the DyT paper has no subtitle, so it is exactly
