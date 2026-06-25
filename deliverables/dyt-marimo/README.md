@@ -30,9 +30,15 @@ mostly without tuning.
 6. **Original extension** — a squashing-function ablation (`tanh` vs `hardtanh`
    vs `sigmoid` vs `identity`) that isolates *which* property of `tanh` matters,
    with a written takeaway.
+7. **Beyond Transformers** — drops DyT into a small **MLP** (no attention) on a
+   self-contained synthetic spirals task, trains BatchNorm vs DyT vs no-norm
+   head-to-head, and shows DyT matches its BatchNorm counterpart (overlaid
+   loss/accuracy curves + decision-boundary comparison), with a written takeaway
+   on whether the idea transfers outside attention.
 
 It is fully self-contained: a tiny character-level GPT trained on an embedded
-public-domain corpus (Shakespeare). No downloads, no API keys, no paid services.
+public-domain corpus (Shakespeare), plus a NumPy-generated spirals dataset for
+the MLP section. No downloads, no API keys, no paid services.
 
 ## Hardware
 

@@ -21,3 +21,10 @@ setup can be killed mid-sync.
 hard-fail on it. Check the per-mirror status log to confirm the last sync. If
 Codeberg shows FAIL, it is usually a transient 504; re-running the sync fixes
 it. Knobs: `MIRROR_MAX_ATTEMPTS`, `MIRROR_RETRY_SLEEP`, `MIRROR_PUSH_TIMEOUT`.
+
+**Distinguishing a 504 from a stale token:** if *all* Codeberg attempts fail
+consistently across separate runs (not just one flaky run), suspect an expired
+`CODEBERG_PAT`, not a 504. Diagnose by pushing once with verbose git output and
+a fresh token via the inline credential helper (don't suppress stderr) — a 504
+shows a gateway error, an expired token shows auth failure. Fix is to rotate the
+`CODEBERG_PAT` secret (request it; secrets can't be set directly).

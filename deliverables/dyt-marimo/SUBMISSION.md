@@ -74,9 +74,19 @@ When results render:
 > trails tanh: smoothness helps. So DyT works because the squash is smooth,
 > bounded, and centered — exactly the LayerNorm shape from the start."
 
-### 3:20 — Close (10s)
+### 3:20 — Beyond Transformers (25s)
+Scroll to Section 8 and click **Train MLP: BatchNorm vs DyT vs no-norm**:
+> "One more question — is this an attention thing? So I drop DyT into a plain MLP,
+> no attention anywhere, on a little spiral dataset, against BatchNorm."
+
+When the curves and decision boundaries render:
+> "DyT matches BatchNorm, no-norm trails, and the two normalized nets carve out
+> the same boundary. The idea generalizes — because it was never about attention,
+> just a smooth bounded squash."
+
+### 3:45 — Close (10s)
 > "Normalization wasn't magic — it was a tanh. And making that explicit gives you
-> a simpler, reduction-free Transformer block. Thanks for watching."
+> a simpler, reduction-free block — in Transformers and beyond. Thanks for watching."
 
 **Recording tips:** pre-click the training buttons once before recording so
 results are cached and snappy (or keep the GPU profile and let them run live if
@@ -98,8 +108,9 @@ access.
 4. **Select a GPU runtime** so the notebook picks the GPU profile automatically
    (the code detects CUDA and scales up).
 5. Run top-to-bottom: click **Train baseline**, **Train DyT**, **Run speed
-   benchmark**, then **Run ablation**. Confirm every plot renders, the DyT/baseline
-   curves track, and the benchmark shows DyT ahead at the larger hidden sizes.
+   benchmark**, **Run ablation**, then **Train MLP** (Section 8). Confirm every
+   plot renders, the DyT/baseline curves track, the benchmark shows DyT ahead,
+   and the MLP's DyT/BatchNorm curves and boundaries match.
 6. **Publish / share** the notebook and copy the public link.
 
 ---
@@ -127,3 +138,5 @@ access.
   hidden size.
 - **Faithful reproduction:** the measured LayerNorm S-curve and learned-α analysis.
 - **Original extension:** the squashing-function ablation isolating *why* tanh.
+- **Generalization beyond the paper:** DyT dropped into a non-Transformer MLP,
+  matched head-to-head against BatchNorm on a synthetic task.

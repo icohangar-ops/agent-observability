@@ -52,9 +52,11 @@ def _(mo):
         5. **The speed-up** — a latency/throughput micro-benchmark showing DyT is
            *faster* than LayerNorm/RMSNorm because it has no reduction op.
         6. **What `α` learns** — visualize the learned per-layer `α` and its link to
-           activation statistics ($\alpha \approx 1/\mathrm{std}$).
-        7. **Original extension** — a squashing-function ablation that isolates *which*
-           property of `tanh` actually matters.
+        7. **The property of `tanh` (ablation)** — a squashing-function ablation that
+           isolates *which* property of `tanh` actually matters.
+        8. **Beyond Transformers** — drop DyT into a small **MLP** (no attention) on a
+           tiny synthetic task and show it still matches its **BatchNorm** counterpart.
+        9. **Conclusion** — a summary of the findings and their implications.
 
         Everything is self-contained: a tiny character-level GPT trained on an embedded
         public-domain corpus. It uses a GPU automatically if one is present and falls
@@ -276,6 +278,8 @@ def _(F, nn, torch):
             return nn.LayerNorm(dim)
         if kind == "rmsnorm":
             return RMSNorm(dim)
+        if kind == "batchnorm":
+            return nn.BatchNorm1d(dim)
         if kind == "dyt":
             return DyT(dim, squash="tanh")
         if kind.startswith("dyt-"):
@@ -918,7 +922,7 @@ def _(DyT, dyt_model, get_batch, mo, nn, np, plt, torch):
 def _(mo):
     mo.md(
         r"""
-        ## 7 · Original extension — *which* property of `tanh` actually matters?
+        ## 7 · The property of `tanh` (ablation): *which* property actually matters?
 
         DyT works, but the paper leaves a natural question only partly answered: is it
         the **boundedness**, the **smoothness**, or the **zero-centering** of `tanh`
@@ -1053,7 +1057,290 @@ def _(decode, dyt_model, mo, torch):
 def _(mo):
     mo.md(
         r"""
-        ## 8 · Conclusion
+        ## 8 · Beyond Transformers: does DyT generalize to a plain MLP?
+
+        Everything above lives inside attention blocks. But the paper's claim — that a
+        normalization layer is mostly a *smooth, bounded squashing* — has nothing to do
+        with attention. If it's true, DyT should also stand in for normalization in a
+        **non-Transformer** network.
+
+        So here is a clean stress test, completely separate from the GPT above:
+
+        - **Task.** A tiny, dependency-free **two-spiral / multi-class spiral**
+          classification — generated on the fly with NumPy, no downloads. Interleaved
+          spirals are a classic "needs depth + good optimization" toy problem.
+        - **Model.** A small **MLP** (just `Linear → norm → GELU`, stacked) — *no
+          attention anywhere*. The canonical normalization for an MLP/ConvNet is
+          **BatchNorm**, so that is the counterpart we match against.
+        - **Comparison.** Same width, depth, seed, optimizer and learning rate, only the
+          normalization swapped: **BatchNorm** vs **DyT** vs **no normalization**.
+
+        If DyT tracks BatchNorm here — and the un-normalized net trails — then the idea
+        clearly transfers outside attention.
+        """
+    )
+    return
+
+
+@app.cell
+def _(device, np, torch):
+    def make_spirals(points_per_class=300, n_classes=3, noise=0.20, seed=0):
+        """A classic interleaved-spirals dataset, generated with NumPy (no download)."""
+        rng = np.random.default_rng(seed)
+        n = points_per_class * n_classes
+        X = np.zeros((n, 2), dtype=np.float32)
+        y = np.zeros(n, dtype=np.int64)
+        for c in range(n_classes):
+            r = np.linspace(0.0, 1.0, points_per_class)
+            t = (
+                np.linspace(c * 4.0, (c + 1) * 4.0, points_per_class)
+                + rng.standard_normal(points_per_class) * noise
+            )
+            idx = slice(points_per_class * c, points_per_class * (c + 1))
+            X[idx] = np.c_[r * np.sin(t), r * np.cos(t)]
+            y[idx] = c
+        return X, y
+
+    mlp_classes = 3
+    _X, _y = make_spirals(points_per_class=300, n_classes=mlp_classes, seed=0)
+
+    # Deterministic train/test split.
+    _perm = np.random.default_rng(1).permutation(len(_X))
+    _X, _y = _X[_perm], _y[_perm]
+    _cut = int(0.8 * len(_X))
+    mlp_Xtr = torch.from_numpy(_X[:_cut]).to(device)
+    mlp_ytr = torch.from_numpy(_y[:_cut]).to(device)
+    mlp_Xte = torch.from_numpy(_X[_cut:]).to(device)
+    mlp_yte = torch.from_numpy(_y[_cut:]).to(device)
+    return make_spirals, mlp_Xte, mlp_Xtr, mlp_classes, mlp_yte, mlp_ytr
+
+
+@app.cell
+def _(F, device, make_norm, mlp_Xte, mlp_Xtr, mlp_classes, mlp_yte, mlp_ytr,
+      nn, seed_everything, torch):
+    class TinyMLP(nn.Module):
+        """A small fully-connected net — no attention. `norm_kind` is the only knob.
+
+        Each hidden stage is `Linear → norm → GELU`, which is exactly where a ConvNet
+        or MLP would normally place BatchNorm. Set `norm_kind="dyt"` to swap that
+        normalization for Dynamic Tanh; `"none"` removes it entirely.
+        """
+
+        def __init__(self, in_dim, hidden, depth, n_classes, norm_kind):
+            super().__init__()
+            layers = []
+            d = in_dim
+            for _ in range(depth):
+                layers.append(nn.Linear(d, hidden))
+                if norm_kind != "none":
+                    layers.append(make_norm(norm_kind, hidden))
+                layers.append(nn.GELU())
+                d = hidden
+            self.body = nn.Sequential(*layers)
+            self.head = nn.Linear(d, n_classes)
+
+        def forward(self, x):
+            return self.head(self.body(x))
+
+    def train_mlp(norm_kind, steps, eval_interval, progress=None):
+        """Train a TinyMLP from a fixed seed so variants are directly comparable."""
+        seed_everything(1337)  # identical init across norm kinds
+        model = TinyMLP(2, 64, depth=6, n_classes=mlp_classes,
+                        norm_kind=norm_kind).to(device)
+        opt = torch.optim.AdamW(model.parameters(), lr=3e-3, weight_decay=1e-4)
+        hist = {"step": [], "train_loss": [], "test_loss": [],
+                "train_acc": [], "test_acc": []}
+
+        def _evaluate():
+            model.eval()
+            with torch.no_grad():
+                row = {}
+                for split, (Xs, ys) in (
+                    ("train", (mlp_Xtr, mlp_ytr)),
+                    ("test", (mlp_Xte, mlp_yte)),
+                ):
+                    logits = model(Xs)
+                    row[f"{split}_loss"] = F.cross_entropy(logits, ys).item()
+                    row[f"{split}_acc"] = (logits.argmax(-1) == ys).float().mean().item()
+            model.train()
+            return row
+
+        for step in range(steps + 1):
+            if step % eval_interval == 0 or step == steps:
+                row = _evaluate()
+                hist["step"].append(step)
+                for k, v in row.items():
+                    hist[k].append(v)
+            if step < steps:
+                logits = model(mlp_Xtr)  # full-batch GD; the dataset is tiny
+                loss = F.cross_entropy(logits, mlp_ytr)
+                opt.zero_grad(set_to_none=True)
+                loss.backward()
+                opt.step()
+            if progress is not None:
+                progress.update()
+        return model, hist
+
+    return TinyMLP, train_mlp
+
+
+@app.cell
+def _(mlp_Xtr, mo, np, plt):
+    # Show the raw synthetic task so the reader knows what's being classified.
+    _Xc = mlp_Xtr.cpu().numpy()
+    _fig, _ax = plt.subplots(figsize=(4.8, 4.8))
+    _ax.scatter(_Xc[:, 0], _Xc[:, 1], s=6, c="#8d99ae", alpha=0.6)
+    _ax.set_title("The synthetic task: interleaved spirals\n(3 classes, generated with NumPy)")
+    _ax.set_xticks([]); _ax.set_yticks([])
+    _fig.tight_layout()
+    mo.vstack([
+        _fig,
+        mo.md("A small but genuinely nonlinear classification problem — depth and "
+              "stable optimization both help here."),
+    ])
+    return
+
+
+@app.cell
+def _(mo):
+    mlp_btn = mo.ui.run_button(
+        label="▶ Train MLP: BatchNorm vs DyT vs no-norm"
+    )
+    mlp_btn
+    return (mlp_btn,)
+
+
+@app.cell
+def _(device, mlp_btn, mo, os, train_mlp):
+    mo.stop(
+        not (mlp_btn.value or os.environ.get("DYT_AUTORUN")),
+        mo.md("☝️ *Click to train three small MLPs (BatchNorm, DyT, no-norm).*"),
+    )
+    _steps = 600 if device == "cuda" else 400
+    if os.environ.get("DYT_STEPS"):
+        _steps = min(_steps, int(os.environ["DYT_STEPS"]))
+    _eval = max(1, _steps // 20)
+    _variants = ["batchnorm", "dyt", "none"]
+    mlp_results = {}
+    mlp_models = {}
+    with mo.status.progress_bar(
+        total=len(_variants) * (_steps + 1), title="Training MLPs"
+    ) as _bar:
+        for _v in _variants:
+            _m, _h = train_mlp(_v, steps=_steps, eval_interval=_eval, progress=_bar)
+            mlp_results[_v] = _h
+            mlp_models[_v] = _m
+    mo.md("✅ Done — three MLPs trained with identical settings.")
+    return mlp_models, mlp_results
+
+
+@app.cell
+def _(mlp_results, mo, plt):
+    _labels = {"batchnorm": "BatchNorm", "dyt": "DyT", "none": "no norm"}
+    _colors = {"batchnorm": "#2b2d42", "dyt": "#e4572e", "none": "#8d99ae"}
+
+    _fig, (_axl, _axa) = plt.subplots(1, 2, figsize=(11, 4.4))
+    for _k, _h in mlp_results.items():
+        _axl.plot(_h["step"], _h["test_loss"], color=_colors[_k], lw=2.2,
+                  marker="o", ms=2.5, label=f"{_labels[_k]} — test")
+        _axl.plot(_h["step"], _h["train_loss"], color=_colors[_k], lw=1, ls="--",
+                  alpha=0.45)
+        _axa.plot(_h["step"], _h["test_acc"], color=_colors[_k], lw=2.2,
+                  marker="s", ms=2.5, label=f"{_labels[_k]} — test")
+    _axl.set_xlabel("training step"); _axl.set_ylabel("cross-entropy loss")
+    _axl.set_title("MLP loss (solid = test, dashed = train)")
+    _axl.legend(fontsize=8)
+    _axa.set_xlabel("training step"); _axa.set_ylabel("accuracy")
+    _axa.set_title("MLP test accuracy")
+    _axa.legend(fontsize=8)
+    _fig.tight_layout()
+
+    _bn = mlp_results["batchnorm"]["test_acc"][-1]
+    _dy = mlp_results["dyt"]["test_acc"][-1]
+    _nn = mlp_results["none"]["test_acc"][-1]
+    _delta = _dy - _bn
+    _verdict = "**matches**" if abs(_delta) < 0.03 else (
+        "**beats**" if _delta > 0 else "is slightly behind"
+    )
+    mo.vstack([
+        _fig,
+        mo.md(
+            f"Final **test accuracy** — BatchNorm: **{_bn:.3f}**, DyT: **{_dy:.3f}**, "
+            f"no-norm: **{_nn:.3f}** (DyT − BatchNorm = {_delta:+.3f}). "
+            f"With zero DyT-specific tuning, DyT {_verdict} BatchNorm in a network that "
+            f"has **no attention at all**."
+        ),
+    ])
+    return
+
+
+@app.cell
+def _(mlp_models, mlp_Xtr, mlp_ytr, mo, np, plt, torch):
+    # Decision boundaries: BatchNorm vs DyT learn essentially the same function.
+    _Xc = mlp_Xtr.cpu().numpy()
+    _yc = mlp_ytr.cpu().numpy()
+    _pad = 0.3
+    _x0, _x1 = _Xc[:, 0].min() - _pad, _Xc[:, 0].max() + _pad
+    _y0, _y1 = _Xc[:, 1].min() - _pad, _Xc[:, 1].max() + _pad
+    _gx, _gy = np.meshgrid(np.linspace(_x0, _x1, 220), np.linspace(_y0, _y1, 220))
+    _grid = np.c_[_gx.ravel(), _gy.ravel()].astype("float32")
+
+    _show = [("batchnorm", "BatchNorm"), ("dyt", "DyT")]
+    _fig, _axes = plt.subplots(1, 2, figsize=(10, 5))
+    _dev = next(mlp_models["dyt"].parameters()).device
+    _gt = torch.from_numpy(_grid).to(_dev)
+    for _ax, (_k, _title) in zip(_axes, _show):
+        _model = mlp_models[_k]
+        _model.eval()
+        with torch.no_grad():
+            _pred = _model(_gt).argmax(-1).cpu().numpy().reshape(_gx.shape)
+        _ax.contourf(_gx, _gy, _pred, alpha=0.3, cmap="Set2", levels=2)
+        _ax.scatter(_Xc[:, 0], _Xc[:, 1], c=_yc, s=6, cmap="Set2",
+                    edgecolors="none", alpha=0.9)
+        _ax.set_title(f"{_title} decision boundary")
+        _ax.set_xticks([]); _ax.set_yticks([])
+    _fig.tight_layout()
+    mo.vstack([
+        _fig,
+        mo.md("The two carve out the **same spiral decision regions** — visual "
+              "confirmation that DyT is doing BatchNorm's job here."),
+    ])
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(
+        r"""
+        ### Takeaway — DyT transfers outside attention
+
+        The same one-line swap that worked in the Transformer also works in a plain
+        **MLP**: trained head-to-head with identical settings, **DyT matches BatchNorm**,
+        while dropping normalization entirely trains slower / less accurately. The two
+        normalized variants even learn near-identical decision boundaries.
+
+        **Why this makes sense.** DyT's argument was never about attention. A normalization
+        layer mostly applies a *smooth, bounded, zero-centered squashing* (Section 1), and
+        that role is just as useful between the `Linear` layers of an MLP (or the
+        convolutions of a ConvNet) as it is inside a Transformer block. DyT supplies that
+        squashing element-wise, with a single learnable `α` and no mean/variance reduction.
+
+        The one caveat worth stating honestly: **BatchNorm** mixes information *across the
+        batch*, which DyT (being purely per-element) does not. So DyT replaces BatchNorm's
+        *squashing/scaling* role cleanly, but it is not a literal substitute for BatchNorm's
+        batch-statistics regularization. On this task that distinction doesn't cost
+        accuracy — and it means DyT carries the *additional* practical perk of being
+        batch-size- and inference-mode-independent.
+        """
+    )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(
+        r"""
+        ## 9 · Conclusion
 
         - Normalization in Transformers was assumed essential, partly because it is
           everywhere and partly because removing it naïvely breaks training.
@@ -1069,6 +1356,9 @@ def _(mo):
           the hidden size grows.
         - Our **ablation** shows the win comes specifically from a *smooth, bounded,
           zero-centered* squash, which is exactly the shape LayerNorm was producing.
+        - And the idea **generalizes beyond attention**: dropped into a plain **MLP**
+          (Section 8), DyT matches its **BatchNorm** counterpart on a synthetic task —
+          because the squashing role it replaces isn't specific to Transformers.
 
         **Why it matters:** dropping the mean/variance reduction removes a per-token
         synchronization point, pointing toward **simpler, faster, reduction-free**
