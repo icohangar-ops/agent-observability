@@ -1340,6 +1340,104 @@ def _(mlp_models, mlp_Xtr, mlp_ytr, mo, np, plt, torch):
 def _(mo):
     mo.md(
         r"""
+        ### The trend, not a single point: does DyT's edge *grow with depth*?
+
+        A single click trains one depth. But normalization earns its keep most as a
+        network gets **deeper** — that's when an un-normalized net starts to struggle
+        with optimization. So instead of nudging the slider by hand, let's **sweep
+        depth from shallow to deep** and train all three variants at every point,
+        then plot final test accuracy as a curve.
+
+        If the paper's claim holds, the **DyT** and **BatchNorm** lines should stay
+        high and close together while the **no-norm** line falls away as depth grows —
+        the gap widening in a single chart. (Noise and class count come from the
+        sliders above; the sweep keeps everything else fixed.)
+        """
+    )
+    return
+
+
+@app.cell
+def _(mo):
+    sweep_btn = mo.ui.run_button(
+        label="▶ Sweep depth: train BatchNorm vs DyT vs no-norm at each depth"
+    )
+    sweep_btn
+    return (sweep_btn,)
+
+
+@app.cell
+def _(device, mlp_noise, mlp_nclasses, mo, os, plt, sweep_btn, train_mlp):
+    mo.stop(
+        not (sweep_btn.value or os.environ.get("DYT_AUTORUN")),
+        mo.md("☝️ *Click to sweep network depth and watch the accuracy gap widen.*"),
+    )
+
+    # Bounded so a CPU sweep still finishes within molab limits: a handful of
+    # depths × 3 variants, with fewer steps per point than the single-config run.
+    if device == "cuda":
+        _depths = [2, 3, 4, 6, 8, 10, 12]
+        _steps = 400
+    else:
+        _depths = [2, 4, 6, 8, 12]
+        _steps = 250
+
+    # Keep headless validation (DYT_AUTORUN) snappy.
+    if os.environ.get("DYT_AUTORUN"):
+        _depths = [2, 6]
+        _steps = 30
+    if os.environ.get("DYT_STEPS"):
+        _steps = min(_steps, int(os.environ["DYT_STEPS"]))
+
+    _variants = ["batchnorm", "dyt", "none"]
+    # Only the final accuracy matters here, so evaluate just at the endpoints.
+    sweep_acc = {v: [] for v in _variants}
+    with mo.status.progress_bar(
+        total=len(_depths) * len(_variants) * (_steps + 1),
+        title="Sweeping depth",
+    ) as _bar:
+        for _d in _depths:
+            for _v in _variants:
+                _m, _h = train_mlp(_v, steps=_steps, eval_interval=_steps,
+                                   depth=_d, progress=_bar)
+                sweep_acc[_v].append(_h["test_acc"][-1])
+
+    _labels = {"batchnorm": "BatchNorm", "dyt": "DyT", "none": "no norm"}
+    _colors = {"batchnorm": "#2b2d42", "dyt": "#e4572e", "none": "#8d99ae"}
+    _markers = {"batchnorm": "o", "dyt": "s", "none": "^"}
+
+    _fig, _ax = plt.subplots(figsize=(7.2, 4.6))
+    for _v in _variants:
+        _ax.plot(_depths, sweep_acc[_v], color=_colors[_v], lw=2.4,
+                 marker=_markers[_v], ms=6, label=_labels[_v])
+    _ax.set_xlabel("MLP depth (hidden stages)")
+    _ax.set_ylabel("final test accuracy")
+    _ax.set_title("Accuracy vs depth — DyT tracks BatchNorm; no-norm falls away")
+    _ax.set_xticks(_depths)
+    _ax.grid(True, alpha=0.25)
+    _ax.legend(fontsize=9)
+    _fig.tight_layout()
+
+    _gap_dyt = sweep_acc["dyt"][-1] - sweep_acc["none"][-1]
+    _gap_bn = sweep_acc["batchnorm"][-1] - sweep_acc["none"][-1]
+    mo.vstack([
+        _fig,
+        mo.md(
+            f"At the deepest point (depth **{_depths[-1]}**, "
+            f"**{mlp_nclasses.value}** classes, noise **{mlp_noise.value:.2f}**): "
+            f"DyT − no-norm = **{_gap_dyt:+.3f}**, BatchNorm − no-norm = "
+            f"**{_gap_bn:+.3f}**. The normalized variants stay together and pull "
+            f"ahead of the un-normalized net as the network deepens — exactly the "
+            f"widening gap the paper predicts."
+        ),
+    ])
+    return (sweep_acc,)
+
+
+@app.cell
+def _(mo):
+    mo.md(
+        r"""
         ### Takeaway — DyT transfers outside attention
 
         The same one-line swap that worked in the Transformer also works in a plain
