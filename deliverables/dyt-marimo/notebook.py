@@ -1340,7 +1340,317 @@ def _(mo):
 def _(mo):
     mo.md(
         r"""
-        ## 9 · Conclusion
+        ## 9 · A second architecture: DyT in a small ConvNet on images
+
+        The MLP above already breaks the "it's an attention thing" assumption. But
+        **BatchNorm** is most associated with **vision** — it was born in ConvNets. So the
+        sharper test is: drop DyT into a small **ConvNet on actual images** and see whether
+        it still stands in for BatchNorm where vision practitioners always put it.
+
+        Same recipe as before, just convolutional:
+
+        - **Task.** A tiny, dependency-free **shapes** dataset — disks, squares and
+          triangles drawn procedurally with NumPy at random size/position with pixel
+          noise. No downloads, no `torchvision`.
+        - **Model.** A small **ConvNet** (`Conv → norm → GELU → pool`, stacked, then a
+          global-pooled linear head). The normalization sits **after each conv and before
+          the activation** — exactly where BatchNorm conventionally lives.
+        - **The DyT twist.** Conv feature maps are **channels-first** `[B, C, H, W]`, so the
+          per-channel `γ/β` have to broadcast over the channel dimension (not the last
+          one). That needs a small **channels-first DyT variant** — same one-scalar-`α`,
+          `tanh`-squash math, just reshaped to drop in for `BatchNorm2d`.
+        - **Comparison.** Identical width, depth, seed, optimizer and learning rate — only
+          the normalization swapped: **BatchNorm** vs **DyT** vs **no normalization**.
+        """
+    )
+    return
+
+
+@app.cell
+def _(device, np, torch):
+    def make_shapes(per_class=200, size=16, noise=0.18, seed=0):
+        """A tiny shapes dataset (disk / square / triangle) drawn with NumPy.
+
+        Each image is a single grayscale channel; shapes are placed at a random
+        position and size with additive pixel noise, so the task is non-trivial but
+        needs no downloads. Returned images are channels-first `[N, 1, size, size]`.
+        """
+        rng = np.random.default_rng(seed)
+        names = ["disk", "square", "triangle"]
+        n = per_class * len(names)
+        X = np.zeros((n, 1, size, size), dtype=np.float32)
+        y = np.zeros(n, dtype=np.int64)
+        yy, xx = np.mgrid[0:size, 0:size]
+        k = 0
+        for ci, name in enumerate(names):
+            for _ in range(per_class):
+                r = int(rng.integers(3, 6))
+                cy = int(rng.integers(r + 1, size - r - 1))
+                cx = int(rng.integers(r + 1, size - r - 1))
+                if name == "disk":
+                    mask = (yy - cy) ** 2 + (xx - cx) ** 2 <= r * r
+                elif name == "square":
+                    mask = (np.abs(yy - cy) <= r) & (np.abs(xx - cx) <= r)
+                else:  # triangle widening downward
+                    half_w = (yy - (cy - r)) * 0.5
+                    mask = (yy >= cy - r) & (yy <= cy + r) & (np.abs(xx - cx) <= half_w)
+                img = mask.astype(np.float32)
+                img += rng.standard_normal((size, size)).astype(np.float32) * noise
+                X[k, 0] = img
+                y[k] = ci
+                k += 1
+        X = (X - X.mean()) / (X.std() + 1e-6)  # standardize the whole set
+        return X, y, names
+
+    conv_size = 16
+    _X, _y, conv_class_names = make_shapes(per_class=200, size=conv_size, seed=0)
+    conv_classes = len(conv_class_names)
+
+    # Deterministic train/test split.
+    _perm = np.random.default_rng(2).permutation(len(_X))
+    _X, _y = _X[_perm], _y[_perm]
+    _cut = int(0.8 * len(_X))
+    conv_Xtr = torch.from_numpy(_X[:_cut]).to(device)
+    conv_ytr = torch.from_numpy(_y[:_cut]).to(device)
+    conv_Xte = torch.from_numpy(_X[_cut:]).to(device)
+    conv_yte = torch.from_numpy(_y[_cut:]).to(device)
+    return (conv_Xte, conv_Xtr, conv_class_names, conv_classes, conv_size,
+            conv_yte, conv_ytr, make_shapes)
+
+
+@app.cell
+def _(F, conv_Xte, conv_Xtr, conv_classes, conv_yte, conv_ytr, device, nn,
+      seed_everything, torch):
+    class DyT2d(nn.Module):
+        """Channels-first Dynamic Tanh for conv feature maps `[B, C, H, W]`.
+
+        Identical math to the `DyT` used in the Transformer and MLP — one learnable
+        scalar `alpha` plus per-channel `gamma`/`beta` — but `gamma`/`beta` broadcast
+        over the **channel** dimension (dim=1) instead of the last dim, so this drops
+        straight in where `BatchNorm2d` goes.
+        """
+
+        def __init__(self, num_channels, init_alpha=0.5):
+            super().__init__()
+            self.alpha = nn.Parameter(torch.full((1,), float(init_alpha)))
+            self.gamma = nn.Parameter(torch.ones(num_channels))
+            self.beta = nn.Parameter(torch.zeros(num_channels))
+
+        def forward(self, x):
+            s = torch.tanh(self.alpha * x)
+            return self.gamma[None, :, None, None] * s + self.beta[None, :, None, None]
+
+    def make_norm2d(kind, channels):
+        if kind == "batchnorm":
+            return nn.BatchNorm2d(channels)
+        if kind == "dyt":
+            return DyT2d(channels)
+        raise ValueError(f"unknown conv norm {kind!r}")
+
+    class TinyConvNet(nn.Module):
+        """A small ConvNet whose only configurable knob is the normalization kind.
+
+        Each stage is `Conv → norm → GELU → MaxPool`, with the normalization placed
+        right after the convolution and before the activation — the canonical slot
+        for BatchNorm in vision. `norm_kind="dyt"` swaps in the channels-first DyT;
+        `"none"` removes normalization entirely.
+        """
+
+        def __init__(self, in_ch, n_classes, norm_kind, width=16):
+            super().__init__()
+            chs = [in_ch, width, width * 2, width * 2]
+            layers = []
+            for i in range(len(chs) - 1):
+                layers.append(nn.Conv2d(chs[i], chs[i + 1], 3, padding=1))
+                if norm_kind != "none":
+                    layers.append(make_norm2d(norm_kind, chs[i + 1]))
+                layers.append(nn.GELU())
+                layers.append(nn.MaxPool2d(2))
+            self.body = nn.Sequential(*layers)
+            self.head = nn.Sequential(
+                nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(chs[-1], n_classes)
+            )
+
+        def forward(self, x):
+            return self.head(self.body(x))
+
+    def train_conv(norm_kind, steps, eval_interval, batch_size=128, progress=None):
+        """Train a TinyConvNet from a fixed seed so variants are directly comparable."""
+        seed_everything(1337)  # identical init across norm kinds
+        model = TinyConvNet(1, conv_classes, norm_kind).to(device)
+        opt = torch.optim.AdamW(model.parameters(), lr=2e-3, weight_decay=1e-4)
+        hist = {"step": [], "train_loss": [], "test_loss": [],
+                "train_acc": [], "test_acc": []}
+        g = torch.Generator().manual_seed(0)  # reproducible minibatches
+        n = conv_Xtr.shape[0]
+
+        def _evaluate():
+            model.eval()
+            with torch.no_grad():
+                row = {}
+                for split, (Xs, ys) in (
+                    ("train", (conv_Xtr, conv_ytr)),
+                    ("test", (conv_Xte, conv_yte)),
+                ):
+                    logits = model(Xs)
+                    row[f"{split}_loss"] = F.cross_entropy(logits, ys).item()
+                    row[f"{split}_acc"] = (logits.argmax(-1) == ys).float().mean().item()
+            model.train()
+            return row
+
+        for step in range(steps + 1):
+            if step % eval_interval == 0 or step == steps:
+                row = _evaluate()
+                hist["step"].append(step)
+                for k, v in row.items():
+                    hist[k].append(v)
+            if step < steps:
+                idx = torch.randint(n, (batch_size,), generator=g).to(device)
+                logits = model(conv_Xtr[idx])
+                loss = F.cross_entropy(logits, conv_ytr[idx])
+                opt.zero_grad(set_to_none=True)
+                loss.backward()
+                opt.step()
+            if progress is not None:
+                progress.update()
+        return model, hist
+
+    return DyT2d, TinyConvNet, make_norm2d, train_conv
+
+
+@app.cell
+def _(conv_Xtr, conv_class_names, conv_ytr, mo, np, plt):
+    # Show the raw synthetic images so the reader knows what's being classified.
+    _Xc = conv_Xtr.cpu().numpy()
+    _yc = conv_ytr.cpu().numpy()
+    _fig, _axes = plt.subplots(3, 6, figsize=(7.5, 4.0))
+    for _ci in range(3):
+        _idx = np.where(_yc == _ci)[0][:6]
+        for _j, _ii in enumerate(_idx):
+            _ax = _axes[_ci, _j]
+            _ax.imshow(_Xc[_ii, 0], cmap="gray")
+            _ax.set_xticks([]); _ax.set_yticks([])
+            if _j == 0:
+                _ax.set_ylabel(conv_class_names[_ci], fontsize=10)
+    _fig.suptitle("The synthetic image task: shapes (3 classes, drawn with NumPy)")
+    _fig.tight_layout()
+    mo.vstack([
+        _fig,
+        mo.md("Small 16×16 grayscale images with random size, position and pixel "
+              "noise — a genuine little vision task, with no downloads."),
+    ])
+    return
+
+
+@app.cell
+def _(mo):
+    conv_btn = mo.ui.run_button(
+        label="▶ Train ConvNet: BatchNorm vs DyT vs no-norm"
+    )
+    conv_btn
+    return (conv_btn,)
+
+
+@app.cell
+def _(conv_btn, device, mo, os, train_conv):
+    mo.stop(
+        not (conv_btn.value or os.environ.get("DYT_AUTORUN")),
+        mo.md("☝️ *Click to train three small ConvNets (BatchNorm, DyT, no-norm).*"),
+    )
+    _steps = 600 if device == "cuda" else 300
+    if os.environ.get("DYT_STEPS"):
+        _steps = min(_steps, int(os.environ["DYT_STEPS"]))
+    _eval = max(1, _steps // 20)
+    _variants = ["batchnorm", "dyt", "none"]
+    conv_results = {}
+    conv_models = {}
+    with mo.status.progress_bar(
+        total=len(_variants) * (_steps + 1), title="Training ConvNets"
+    ) as _bar:
+        for _v in _variants:
+            _m, _h = train_conv(_v, steps=_steps, eval_interval=_eval, progress=_bar)
+            conv_results[_v] = _h
+            conv_models[_v] = _m
+    mo.md("✅ Done — three ConvNets trained with identical settings.")
+    return conv_models, conv_results
+
+
+@app.cell
+def _(conv_results, mo, plt):
+    _labels = {"batchnorm": "BatchNorm", "dyt": "DyT", "none": "no norm"}
+    _colors = {"batchnorm": "#2b2d42", "dyt": "#e4572e", "none": "#8d99ae"}
+
+    _fig, (_axl, _axa) = plt.subplots(1, 2, figsize=(11, 4.4))
+    for _k, _h in conv_results.items():
+        _axl.plot(_h["step"], _h["test_loss"], color=_colors[_k], lw=2.2,
+                  marker="o", ms=2.5, label=f"{_labels[_k]} — test")
+        _axl.plot(_h["step"], _h["train_loss"], color=_colors[_k], lw=1, ls="--",
+                  alpha=0.45)
+        _axa.plot(_h["step"], _h["test_acc"], color=_colors[_k], lw=2.2,
+                  marker="s", ms=2.5, label=f"{_labels[_k]} — test")
+    _axl.set_xlabel("training step"); _axl.set_ylabel("cross-entropy loss")
+    _axl.set_title("ConvNet loss (solid = test, dashed = train)")
+    _axl.legend(fontsize=8)
+    _axa.set_xlabel("training step"); _axa.set_ylabel("accuracy")
+    _axa.set_title("ConvNet test accuracy")
+    _axa.legend(fontsize=8)
+    _fig.tight_layout()
+
+    _bn = conv_results["batchnorm"]["test_acc"][-1]
+    _dy = conv_results["dyt"]["test_acc"][-1]
+    _nn = conv_results["none"]["test_acc"][-1]
+    _delta = _dy - _bn
+    _verdict = "**matches**" if abs(_delta) < 0.03 else (
+        "**beats**" if _delta > 0 else "is slightly behind"
+    )
+    mo.vstack([
+        _fig,
+        mo.md(
+            f"Final **test accuracy** — BatchNorm: **{_bn:.3f}**, DyT: **{_dy:.3f}**, "
+            f"no-norm: **{_nn:.3f}** (DyT − BatchNorm = {_delta:+.3f}). "
+            f"Dropped into BatchNorm's home turf — a **ConvNet on images** — DyT "
+            f"{_verdict} BatchNorm with zero DyT-specific tuning."
+        ),
+    ])
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(
+        r"""
+        ### Takeaway — DyT works in a ConvNet on images too
+
+        On **BatchNorm's own home turf** — convolutions over images — the same one-line
+        swap holds: trained head-to-head with identical settings, **DyT tracks BatchNorm**
+        step for step. The only code that changed from the MLP was making `γ/β` broadcast
+        over the **channel** axis of a `[B, C, H, W]` feature map; the `γ · tanh(α·x) + β`
+        math is untouched.
+
+        That is a meaningful second data point. BatchNorm is the normalization vision grew
+        up with, and the usual mental model is that it earns its keep by *normalizing across
+        the batch*. Yet a purely **per-element** squash with one learnable `α` keeps pace
+        here — which says the part of BatchNorm DyT is standing in for is again the
+        *smooth, bounded squashing*, not the batch statistics.
+
+        **An honest word on the no-norm baseline.** This shapes task is small and quite
+        separable, so the *un-normalized* net keeps up here too — normalization tends to
+        become genuinely load-bearing with more depth, higher learning rates and larger
+        images, not on a toy like this. So the claim this section makes is the narrow,
+        robust one: **wherever BatchNorm is the natural choice, DyT can drop in for it** —
+        now shown in a ConvNet on images, not just an MLP. And the same caveat as before
+        still holds: DyT does not reproduce BatchNorm's cross-batch regularization — but in
+        exchange it is batch-size- and inference-mode-independent.
+        """
+    )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(
+        r"""
+        ## 10 · Conclusion
 
         - Normalization in Transformers was assumed essential, partly because it is
           everywhere and partly because removing it naïvely breaks training.
@@ -1357,8 +1667,10 @@ def _(mo):
         - Our **ablation** shows the win comes specifically from a *smooth, bounded,
           zero-centered* squash, which is exactly the shape LayerNorm was producing.
         - And the idea **generalizes beyond attention**: dropped into a plain **MLP**
-          (Section 8), DyT matches its **BatchNorm** counterpart on a synthetic task —
-          because the squashing role it replaces isn't specific to Transformers.
+          (Section 8) and a small **ConvNet on images** (Section 9), DyT matches its
+          **BatchNorm** counterpart on synthetic tasks — two different architectures,
+          including BatchNorm's own vision home turf — because the squashing role it
+          replaces isn't specific to Transformers.
 
         **Why it matters:** dropping the mean/variance reduction removes a per-token
         synchronization point, pointing toward **simpler, faster, reduction-free**

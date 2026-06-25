@@ -35,10 +35,17 @@ mostly without tuning.
    head-to-head, and shows DyT matches its BatchNorm counterpart (overlaid
    loss/accuracy curves + decision-boundary comparison), with a written takeaway
    on whether the idea transfers outside attention.
+8. **A second architecture (ConvNet on images)** — drops a channels-first DyT
+   variant into a small **ConvNet** on a procedurally-generated **shapes** image
+   dataset (disks/squares/triangles, NumPy, no downloads), placed where
+   `BatchNorm2d` normally goes (after conv, before activation), and shows DyT
+   matches BatchNorm on BatchNorm's own vision home turf (overlaid loss/accuracy
+   curves + a written takeaway).
 
 It is fully self-contained: a tiny character-level GPT trained on an embedded
 public-domain corpus (Shakespeare), plus a NumPy-generated spirals dataset for
-the MLP section. No downloads, no API keys, no paid services.
+the MLP section and a NumPy-generated shapes image dataset for the ConvNet
+section. No downloads, no API keys, no paid services.
 
 ## Hardware
 

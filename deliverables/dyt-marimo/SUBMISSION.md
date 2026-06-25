@@ -84,7 +84,20 @@ When the curves and decision boundaries render:
 > the same boundary. The idea generalizes — because it was never about attention,
 > just a smooth bounded squash."
 
-### 3:45 — Close (10s)
+### 3:45 — A second architecture: ConvNet on images (20s)
+Scroll to Section 9 and click **Train ConvNet: BatchNorm vs DyT vs no-norm**:
+> "And BatchNorm's real home is vision. So one more test — a small ConvNet on a
+> tiny shapes-image dataset, with DyT slotted in channels-first where BatchNorm2d
+> normally goes."
+
+When the curves render:
+> "Same story on BatchNorm's own turf: DyT keeps pace with BatchNorm. The only
+> change was broadcasting gamma and beta over channels — the tanh math is
+> untouched. This shapes task is small enough that even the un-normalized net
+> keeps up, so the claim is the narrow, robust one: wherever BatchNorm fits, DyT
+> can drop in for it."
+
+### 4:10 — Close (10s)
 > "Normalization wasn't magic — it was a tanh. And making that explicit gives you
 > a simpler, reduction-free block — in Transformers and beyond. Thanks for watching."
 
@@ -108,9 +121,10 @@ access.
 4. **Select a GPU runtime** so the notebook picks the GPU profile automatically
    (the code detects CUDA and scales up).
 5. Run top-to-bottom: click **Train baseline**, **Train DyT**, **Run speed
-   benchmark**, **Run ablation**, then **Train MLP** (Section 8). Confirm every
-   plot renders, the DyT/baseline curves track, the benchmark shows DyT ahead,
-   and the MLP's DyT/BatchNorm curves and boundaries match.
+   benchmark**, **Run ablation**, **Train MLP** (Section 8), then **Train
+   ConvNet** (Section 9). Confirm every plot renders, the DyT/baseline curves
+   track, the benchmark shows DyT ahead, the MLP's DyT/BatchNorm curves and
+   boundaries match, and the ConvNet's DyT/BatchNorm curves match.
 6. **Publish / share** the notebook and copy the public link.
 
 ---
@@ -138,5 +152,6 @@ access.
   hidden size.
 - **Faithful reproduction:** the measured LayerNorm S-curve and learned-α analysis.
 - **Original extension:** the squashing-function ablation isolating *why* tanh.
-- **Generalization beyond the paper:** DyT dropped into a non-Transformer MLP,
-  matched head-to-head against BatchNorm on a synthetic task.
+- **Generalization beyond the paper:** DyT dropped into a non-Transformer MLP
+  *and* a small ConvNet on images, matched head-to-head against BatchNorm on
+  synthetic tasks — two distinct architectures, including BatchNorm's vision turf.
