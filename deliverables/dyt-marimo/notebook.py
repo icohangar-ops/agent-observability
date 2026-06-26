@@ -1433,24 +1433,33 @@ def _(device, mlp_noise, mlp_nclasses, mo, os, plt, sweep_btn, train_mlp):
     _colors = {"batchnorm": "#2b2d42", "dyt": "#e4572e", "none": "#8d99ae"}
     _markers = {"batchnorm": "o", "dyt": "s", "none": "^"}
 
-    _fig, _ax = plt.subplots(figsize=(7.2, 4.6))
-    for _v in _variants:
-        _ax.plot(_depths, sweep_acc[_v], color=_colors[_v], lw=2.4,
-                 marker=_markers[_v], ms=6, label=_labels[_v])
-    _ax.set_xlabel("MLP depth (hidden stages)")
-    _ax.set_ylabel("final test accuracy")
-    _ax.set_title("Accuracy vs depth — DyT tracks BatchNorm; no-norm falls away")
-    _ax.set_xticks(_depths)
-    _ax.grid(True, alpha=0.25)
-    _ax.legend(fontsize=9)
-    _fig.tight_layout()
-
     _gap_dyt = sweep_acc["dyt"][-1] - sweep_acc["none"][-1]
     _gap_bn = sweep_acc["batchnorm"][-1] - sweep_acc["none"][-1]
     # On a gentle task (low noise / few classes) the un-normalized net can keep
     # pace even at the deepest point, so soften the "widening gap" claim when both
     # gaps at the deepest depth are small.
     _max_gap = max(_gap_dyt, _gap_bn)
+    # Match the title to the live gap so it never claims "no-norm falls away"
+    # when the un-normalized net is actually keeping pace.
+    if _max_gap < 0.03:
+        _title = "Accuracy vs depth — DyT tracks BatchNorm; no-norm keeps pace here"
+    elif _max_gap < 0.08:
+        _title = "Accuracy vs depth — DyT tracks BatchNorm; no-norm edges behind"
+    else:
+        _title = "Accuracy vs depth — DyT tracks BatchNorm; no-norm falls away"
+
+    _fig, _ax = plt.subplots(figsize=(7.2, 4.6))
+    for _v in _variants:
+        _ax.plot(_depths, sweep_acc[_v], color=_colors[_v], lw=2.4,
+                 marker=_markers[_v], ms=6, label=_labels[_v])
+    _ax.set_xlabel("MLP depth (hidden stages)")
+    _ax.set_ylabel("final test accuracy")
+    _ax.set_title(_title)
+    _ax.set_xticks(_depths)
+    _ax.grid(True, alpha=0.25)
+    _ax.legend(fontsize=9)
+    _fig.tight_layout()
+
     if _max_gap < 0.03:
         _verdict = (
             "On this gentle setting the un-normalized net keeps pace even at the "
