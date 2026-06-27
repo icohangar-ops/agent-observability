@@ -56,3 +56,5 @@ scripts/.mirror-sync-status.log
 __pycache__/
 *.pyc
 .marimo/
+.vercel
+.env*
